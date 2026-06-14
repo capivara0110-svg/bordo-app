@@ -1,4 +1,4 @@
-﻿export const C = {
+export const C = {
   ocean: "#0A2540",
   wave: "#1B4F72",
   aqua: "#17A8BD",

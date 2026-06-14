@@ -1,4 +1,4 @@
-﻿const jwt = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET || "bordo-secret-key-2026";
 
 function authMiddleware(req, res, next) {

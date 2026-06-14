@@ -1,4 +1,4 @@
-﻿const API = "http://localhost:3001/api";
+const API = "http://localhost:3001/api";
 
 // ─── CLIENTE HTTP ───────────────────────────────────────
 async function request(path, options = {}) {

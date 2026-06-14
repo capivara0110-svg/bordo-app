@@ -1,4 +1,4 @@
-﻿import { C } from "../styles/theme.js";
+import { C } from "../styles/theme.js";
 
 // ─── TRIPULAÇÃO ────────────────────────────────────────────
 export const mockCrew = [
