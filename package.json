@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "bordo-app",
   "private": true,
   "version": "1.0.0",
@@ -7,23 +7,19 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "node server/index.cjs",
+    "start": "node server/index.cjs",
     "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "cd server && npm install"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.10.1",
-    "concurrently": "^10.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "concurrently": "^9.1.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.2",
