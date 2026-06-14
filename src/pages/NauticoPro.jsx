@@ -1,11 +1,24 @@
-﻿import React, { useState } from "react";
-import { C, fonts, shadow } from "../styles/theme.js";
-import { mockDiario, mockChecklist, mockCrew, mockEstoque, mockOrdens, PERFIS_SISTEMA } from "../data/mock.js";
+﻿import React, { useState, useEffect } from "react";
+import { C, fonts } from "../styles/theme.js";
+import { api } from "../services/api.js";
+import { PERFIS_SISTEMA } from "../data/mock.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 
 export default function NauticoPro({ profile, onLogout }) {
   const fullProfile = PERFIS_SISTEMA.find(p => p.id === profile.id) || profile;
   const [tab, setTab] = useState(fullProfile.tabs?.[0]?.id || "diario");
+
+  // Estados dos dados
+  const [diario, setDiario] = useState([]);
+  const [checklist, setChecklist] = useState([]);
+  const [tripulacao, setTripulacao] = useState([]);
+  const [estoque, setEstoque] = useState([]);
+  const [ordens, setOrdens] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modal de criar
+  const [showModal, setShowModal] = useState(null); // "diario" | "checklist" | null
+  const [formData, setFormData] = useState({});
 
   const tabs = fullProfile.tabs || [
     { id: "diario", icon: "📋", label: "Diário" },
@@ -13,6 +26,66 @@ export default function NauticoPro({ profile, onLogout }) {
     { id: "tripulacao", icon: "👥", label: "Tripulação" },
     { id: "estoque", icon: "📦", label: "Estoque" },
   ];
+
+  // Carrega dados ao abrir
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const [d, cl, t, e, o] = await Promise.all([
+          api.diario.listar(),
+          api.checklist.listar(),
+          api.tripulacao.listar(),
+          api.estoque.listar(),
+          api.ordens.listar(),
+        ]);
+        setDiario(d);
+        setChecklist(cl);
+        setTripulacao(t);
+        setEstoque(e);
+        setOrdens(o);
+      } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+      }
+      setLoading(false);
+    }
+    loadData();
+  }, []);
+
+  // ─── AÇÕES ─────────────────────────────────────────────
+  const criarDiario = async () => {
+    if (!formData.tipo || !formData.descricao) return;
+    try {
+      const novo = await api.diario.criar(formData.tipo, formData.descricao, fullProfile.user?.name);
+      setDiario([novo, ...diario]);
+      setShowModal(null);
+      setFormData({});
+    } catch (err) { alert(err.message); }
+  };
+
+  const assinarDiario = async (id) => {
+    try {
+      await api.diario.assinar(id);
+      setDiario(diario.map(d => d.id === id ? { ...d, assinado: 1 } : d));
+    } catch (err) { alert(err.message); }
+  };
+
+  const toggleChecklist = async (id) => {
+    try {
+      await api.checklist.toggle(id);
+      setChecklist(checklist.map(c => c.id === id ? { ...c, feito: c.feito ? 0 : 1 } : c));
+    } catch (err) { alert(err.message); }
+  };
+
+  const criarChecklist = async () => {
+    if (!formData.categoria || !formData.item) return;
+    try {
+      const novo = await api.checklist.criar(formData.categoria, formData.item);
+      setChecklist([...checklist, novo]);
+      setShowModal(null);
+      setFormData({});
+    } catch (err) { alert(err.message); }
+  };
 
   const UserBar = () => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -27,7 +100,24 @@ export default function NauticoPro({ profile, onLogout }) {
     </div>
   );
 
+  // ─── MODAL ──────────────────────────────────────────────
+  const Modal = ({ children }) => (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+    }} onClick={() => setShowModal(null)}>
+      <div style={{
+        background: C.ocean, borderRadius: 20, padding: 24, maxWidth: 380,
+        width: "100%", border: "1px solid rgba(255,255,255,0.1)"
+      }} onClick={e => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  );
+
   const renderTab = () => {
+    if (loading) return <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Carregando...</div>;
+
     switch (tab) {
       case "diario":
         return (
@@ -35,28 +125,45 @@ export default function NauticoPro({ profile, onLogout }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
                 <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Registros</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{mockDiario.length} registros</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{diario.length} registros</div>
               </div>
-              <button style={{ background: C.aqua, border: "none", borderRadius: 10, padding: "10px 16px", color: C.white, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+ Novo</button>
+              <button onClick={() => setShowModal("diario")} style={{ background: C.aqua, border: "none", borderRadius: 10, padding: "10px 16px", color: C.white, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+ Novo</button>
             </div>
-            {mockDiario.map(r => (
+            {diario.length === 0 && <div style={{ textAlign: "center", color: "rgba(255,255,255,0.2)", padding: 40 }}>Nenhum registro ainda</div>}
+            {diario.map(r => (
               <div key={r.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: r.type === "Saída" ? C.aqua : r.type === "Ocorrência" ? C.rust : C.gold }}>
-                    {r.type}
-                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: r.tipo === "Saída" ? C.aqua : r.tipo === "Ocorrência" ? C.rust : C.gold }}>{r.tipo}</span>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>·</span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{r.date} às {r.time}</span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{r.data} às {r.hora}</span>
                 </div>
-                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.5, marginBottom: 8 }}>{r.description}</p>
+                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.5, marginBottom: 8 }}>{r.descricao}</p>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>por {r.author}</span>
-                  <span style={{ fontSize: 11, color: r.signed ? C.green : C.gold, fontWeight: 700 }}>
-                    {r.signed ? "✏️ Assinado" : "⏳ Pendente"}
-                  </span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>por {r.autor}</span>
+                  {r.assinado ? (
+                    <span style={{ fontSize: 11, color: C.green, fontWeight: 700 }}>✏️ Assinado</span>
+                  ) : (
+                    <button onClick={() => assinarDiario(r.id)} style={{ fontSize: 11, color: C.gold, fontWeight: 700, background: "none", border: "none", cursor: "pointer" }}>⏳ Assinar</button>
+                  )}
                 </div>
               </div>
             ))}
+            {showModal === "diario" && (
+              <Modal>
+                <div style={{ fontSize: 16, fontWeight: 700, color: C.white, marginBottom: 16 }}>📋 Novo Registro</div>
+                <select value={formData.tipo || ""} onChange={e => setFormData({ ...formData, tipo: e.target.value })}
+                  style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: C.white, fontSize: 14, marginBottom: 12 }}>
+                  <option value="">Tipo</option>
+                  <option value="Saída">Saída</option>
+                  <option value="Chegada">Chegada</option>
+                  <option value="Ocorrência">Ocorrência</option>
+                  <option value="Manutenção">Manutenção</option>
+                </select>
+                <textarea placeholder="Descrição..." value={formData.descricao || ""} onChange={e => setFormData({ ...formData, descricao: e.target.value })}
+                  style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: C.white, fontSize: 14, minHeight: 80, marginBottom: 16, fontFamily: fonts.body }} />
+                <button onClick={criarDiario} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: C.aqua, color: C.white, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Salvar</button>
+              </Modal>
+            )}
           </div>
         );
 
@@ -66,12 +173,14 @@ export default function NauticoPro({ profile, onLogout }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
                 <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Segurança</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>Check-list de Saída</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>Check-list</div>
               </div>
+              <button onClick={() => setShowModal("checklist")} style={{ background: C.aqua, border: "none", borderRadius: 10, padding: "10px 16px", color: C.white, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+ Item</button>
             </div>
             {["Segurança", "Motor", "Navegação", "Comunicação"].map(cat => {
-              const items = mockChecklist.filter(i => i.category === cat);
-              const done = items.filter(i => i.done).length;
+              const items = checklist.filter(i => i.categoria === cat);
+              const done = items.filter(i => i.feito).length;
+              if (items.length === 0) return null;
               return (
                 <div key={cat} style={{ marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -79,15 +188,15 @@ export default function NauticoPro({ profile, onLogout }) {
                     <span style={{ fontSize: 11, color: C.aqua, fontWeight: 700 }}>{done}/{items.length}</span>
                   </div>
                   {items.map(i => (
-                    <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
+                    <div key={i.id} onClick={() => toggleChecklist(i.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer" }}>
                       <div style={{
-                        width: 20, height: 20, borderRadius: 6, border: `2px solid ${i.done ? C.green : "rgba(255,255,255,0.2)"}`,
-                        background: i.done ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 11, color: C.white, cursor: "pointer", flexShrink: 0
+                        width: 20, height: 20, borderRadius: 6, border: `2px solid ${i.feito ? C.green : "rgba(255,255,255,0.2)"}`,
+                        background: i.feito ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 11, color: C.white, flexShrink: 0
                       }}>
-                        {i.done ? "✓" : ""}
+                        {i.feito ? "✓" : ""}
                       </div>
-                      <span style={{ fontSize: 13, color: i.done ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.8)", textDecoration: i.done ? "line-through" : "none" }}>
+                      <span style={{ fontSize: 13, color: i.feito ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.8)", textDecoration: i.feito ? "line-through" : "none" }}>
                         {i.item}
                       </span>
                     </div>
@@ -95,31 +204,45 @@ export default function NauticoPro({ profile, onLogout }) {
                 </div>
               );
             })}
+            {showModal === "checklist" && (
+              <Modal>
+                <div style={{ fontSize: 16, fontWeight: 700, color: C.white, marginBottom: 16 }}>✅ Novo Item</div>
+                <select value={formData.categoria || ""} onChange={e => setFormData({ ...formData, categoria: e.target.value })}
+                  style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: C.white, fontSize: 14, marginBottom: 12 }}>
+                  <option value="">Categoria</option>
+                  <option value="Segurança">Segurança</option>
+                  <option value="Motor">Motor</option>
+                  <option value="Navegação">Navegação</option>
+                  <option value="Comunicação">Comunicação</option>
+                </select>
+                <input placeholder="Item..." value={formData.item || ""} onChange={e => setFormData({ ...formData, item: e.target.value })}
+                  style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: C.white, fontSize: 14, marginBottom: 16 }} />
+                <button onClick={criarChecklist} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: C.aqua, color: C.white, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Adicionar</button>
+              </Modal>
+            )}
           </div>
         );
 
       case "tripulacao":
         return (
           <div style={{ padding: "12px 16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Tripulação</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{mockCrew.length} membros</div>
-              </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Tripulação</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{tripulacao.length} membros</div>
             </div>
-            {mockCrew.map(m => (
-              <div key={m.name} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
+            {tripulacao.map(m => (
+              <div key={m.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                  <span style={{ fontSize: 28 }}>{m.avatar}</span>
+                  <span style={{ fontSize: 28 }}>{m.avatar || "👤"}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{m.name}</div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{m.role}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{m.nome}</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{m.cargo}</div>
                   </div>
                   <StatusBadge status={m.status} />
                 </div>
                 <div style={{ display: "flex", gap: 12, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                  <span>📄 Habilitação: {m.docs.habilitacao}</span>
-                  <span>📜 Certificado: {m.docs.certificado}</span>
+                  <span>📄 Hab.: {m.habilitacao || "—"}</span>
+                  <span>📜 Cert.: {m.certificado || "—"}</span>
                 </div>
               </div>
             ))}
@@ -129,28 +252,26 @@ export default function NauticoPro({ profile, onLogout }) {
       case "estoque":
         return (
           <div style={{ padding: "12px 16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Estoque</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{mockEstoque.length} itens</div>
-              </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Estoque</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{estoque.length} itens</div>
             </div>
-            {mockEstoque.map(item => {
-              const baixo = item.qty < item.min;
+            {estoque.map(item => {
+              const baixo = item.quantidade < item.minimo;
               return (
-                <div key={item.name} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 8, borderLeft: `3px solid ${baixo ? C.rust : C.green}` }}>
+                <div key={item.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 8, borderLeft: `3px solid ${baixo ? C.rust : C.green}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.white }}>{item.name}</div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{item.category}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.white }}>{item.nome}</div>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{item.categoria}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: baixo ? C.rust : C.aqua }}>{item.qty}</div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{item.unit}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: baixo ? C.rust : C.aqua }}>{item.quantidade}</div>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{item.unidade}</div>
                     </div>
                   </div>
                   <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 4, height: 4, marginTop: 4 }}>
-                    <div style={{ width: `${Math.min(100, (item.qty / item.min) * 100)}%`, height: "100%", borderRadius: 4, background: baixo ? C.rust : C.aqua }} />
+                    <div style={{ width: `${Math.min(100, (item.quantidade / item.minimo) * 100)}%`, height: "100%", borderRadius: 4, background: baixo ? C.rust : C.aqua }} />
                   </div>
                 </div>
               );
@@ -161,19 +282,16 @@ export default function NauticoPro({ profile, onLogout }) {
       case "ordens":
         return (
           <div style={{ padding: "12px 16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Ordens</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{mockOrdens.length} ordens</div>
-              </div>
-              <button style={{ background: C.aqua, border: "none", borderRadius: 10, padding: "10px 16px", color: C.white, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+ Nova OS</button>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Ordens</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{ordens.length} ordens</div>
             </div>
-            {mockOrdens.map(os => (
+            {ordens.map(os => (
               <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{os.codigo}</div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{os.embarcacao} · {os.cliente}</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{os.embarcacao} · {os.cliente || "Sem cliente"}</div>
                   </div>
                   <StatusBadge status={os.status} />
                 </div>

@@ -1,0 +1,129 @@
+﻿const API = "http://localhost:3001/api";
+
+// ─── CLIENTE HTTP ───────────────────────────────────────
+async function request(path, options = {}) {
+  const token = localStorage.getItem("bordo_token");
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  const res = await fetch(`${API}${path}`, {
+    ...options,
+    headers,
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.erro || "Erro na requisição");
+  }
+
+  return data;
+}
+
+// ─── AUTH ────────────────────────────────────────────────
+export const api = {
+  // Login
+  login: (email, senha) =>
+    request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, senha }),
+    }),
+
+  // Registro
+  registro: (nome, email, senha, perfil) =>
+    request("/auth/registro", {
+      method: "POST",
+      body: JSON.stringify({ nome, email, senha, perfil }),
+    }),
+
+  // Meus dados
+  me: () => request("/auth/me"),
+
+  // ─── DIÁRIO ──────────────────────────────────────────
+  diario: {
+    listar: () => request("/diario"),
+    criar: (tipo, descricao, autor) =>
+      request("/diario", {
+        method: "POST",
+        body: JSON.stringify({ tipo, descricao, autor }),
+      }),
+    assinar: (id) =>
+      request(`/diario/${id}/assinar`, { method: "PUT" }),
+  },
+
+  // ─── CHECKLIST ────────────────────────────────────────
+  checklist: {
+    listar: () => request("/checklist"),
+    toggle: (id) =>
+      request(`/checklist/${id}/toggle`, { method: "PUT" }),
+    criar: (categoria, item) =>
+      request("/checklist", {
+        method: "POST",
+        body: JSON.stringify({ categoria, item }),
+      }),
+  },
+
+  // ─── TRIPULAÇÃO ───────────────────────────────────────
+  tripulacao: {
+    listar: () => request("/tripulacao"),
+    criar: (nome, cargo, habilitacao, certificado) =>
+      request("/tripulacao", {
+        method: "POST",
+        body: JSON.stringify({ nome, cargo, habilitacao, certificado }),
+      }),
+  },
+
+  // ─── ESTOQUE ──────────────────────────────────────────
+  estoque: {
+    listar: () => request("/estoque"),
+    criar: (nome, unidade, quantidade, minimo, categoria) =>
+      request("/estoque", {
+        method: "POST",
+        body: JSON.stringify({ nome, unidade, quantidade, minimo, categoria }),
+      }),
+    atualizar: (id, quantidade) =>
+      request(`/estoque/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ quantidade }),
+      }),
+  },
+
+  // ─── ORDENS DE SERVIÇO ────────────────────────────────
+  ordens: {
+    listar: () => request("/ordens"),
+    criar: (embarcacao, cliente, tipo, prioridade, descricao, responsavel) =>
+      request("/ordens", {
+        method: "POST",
+        body: JSON.stringify({
+          embarcacao, cliente, tipo, prioridade, descricao, responsavel,
+        }),
+      }),
+    atualizarStatus: (id, status) =>
+      request(`/ordens/${id}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status }),
+      }),
+    toggleTarefa: (id, tarefaId) =>
+      request(`/ordens/${id}/tarefa/${tarefaId}`, { method: "PUT" }),
+  },
+
+  // ─── NOTIFICAÇÕES ─────────────────────────────────────
+  notificacoes: {
+    listar: () => request("/notificacoes"),
+    ler: (id) => request(`/notificacoes/${id}/ler`, { method: "PUT" }),
+  },
+
+  // ─── BERÇOS ───────────────────────────────────────────
+  bercos: {
+    listar: () => request("/bercos"),
+  },
+
+  // ─── DASHBOARD ────────────────────────────────────────
+  dashboard: {
+    dados: () => request("/dashboard"),
+  },
+};

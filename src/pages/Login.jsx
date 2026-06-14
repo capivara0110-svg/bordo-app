@@ -1,10 +1,43 @@
 ﻿import React, { useState } from "react";
 import { C, fonts } from "../styles/theme.js";
+import { api } from "../services/api.js";
 import { PERFIS_SISTEMA } from "../data/mock.js";
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState("");
-  const [step, setStep] = useState("inicio"); // inicio | perfis | senha
+  const [senha, setSenha] = useState("");
+  const [step, setStep] = useState("inicio");
+  const [erro, setErro] = useState("");
+  const [carregando, setCarregando] = useState(false);
+
+  const handleContinuar = () => {
+    if (!email.includes("@")) return;
+    // Verifica se é um email de teste rápido
+    if (email === "admin@bordo.app" || email === "carlos@bordo.app" ||
+        email === "rafael@bordo.app" || email === "ana@bordo.app") {
+      setStep("senha");
+      setSenha("");
+      setErro("");
+    } else {
+      setStep("senha");
+      setSenha("");
+      setErro("");
+    }
+  };
+
+  const handleLogin = async () => {
+    setCarregando(true);
+    setErro("");
+
+    try {
+      const data = await api.login(email, senha);
+      onLogin(data);
+    } catch (err) {
+      setErro(err.message || "Erro ao fazer login");
+    } finally {
+      setCarregando(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: C.ocean, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -13,52 +46,99 @@ export default function Login({ onLogin }) {
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{ fontFamily: fonts.display, fontSize: 28, fontWeight: 800, color: C.ocean }}>BORDO<span style={{ color: C.aqua }}>.</span></div>
           <div style={{ fontSize: 13, color: C.gray, marginTop: 4 }}>
-            {step === "inicio" ? "Acesse sua conta" : step === "perfis" ? "Escolha seu perfil" : "Digite sua senha"}
+            {step === "inicio" ? "Acesse sua conta" : "Digite sua senha"}
           </div>
         </div>
 
+        {erro && (
+          <div style={{
+            background: "#f8d7da", color: "#721c24", borderRadius: 10, padding: "10px 14px",
+            fontSize: 13, marginBottom: 16, textAlign: "center"
+          }}>
+            {erro}
+          </div>
+        )}
+
         {step === "inicio" && (
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: C.ocean, display: "block", marginBottom: 6 }}>E-mail profissional</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: C.ocean, display: "block", marginBottom: 6 }}>
+              E-mail profissional
+            </label>
             <input
               type="email"
               placeholder="seu@email.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "1.5px solid #E0E6EB", fontSize: 15, outline: "none", marginBottom: 20, fontFamily: fonts.body }}
+              onChange={(e) => { setEmail(e.target.value); setErro(""); }}
+              onKeyDown={(e) => e.key === "Enter" && handleContinuar()}
+              style={{
+                width: "100%", padding: "14px 16px", borderRadius: 12,
+                border: "1.5px solid #E0E6EB", fontSize: 15, outline: "none",
+                marginBottom: 8, fontFamily: fonts.body
+              }}
             />
+            <div style={{ fontSize: 11, color: C.gray, marginBottom: 16 }}>
+              Teste: carlos@bordo.app, rafael@bordo.app, ana@bordo.app, admin@bordo.app
+            </div>
             <button
-              onClick={() => setStep("perfis")}
+              onClick={handleContinuar}
               disabled={!email.includes("@")}
               style={{
                 width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
                 background: email.includes("@") ? C.aqua : "#d5dde5",
                 color: email.includes("@") ? C.white : C.gray,
-                fontSize: 15, fontWeight: 700, fontFamily: fonts.display, cursor: email.includes("@") ? "pointer" : "not-allowed"
+                fontSize: 15, fontWeight: 700, fontFamily: fonts.display,
+                cursor: email.includes("@") ? "pointer" : "not-allowed"
               }}>
               Continuar →
             </button>
           </div>
         )}
 
-        {step === "perfis" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {PERFIS_SISTEMA.map(p => (
-              <button key={p.id} onClick={() => { onLogin(p); }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
-                  borderRadius: 14, border: "1.5px solid #E0E6EB", background: C.white,
-                  cursor: "pointer", textAlign: "left", width: "100%", transition: "all 0.2s"
-                }}
-                onMouseOver={e => e.target.style.borderColor = p.color}
-                onMouseOut={e => e.target.style.borderColor = "#E0E6EB"}>
-                <span style={{ fontSize: 28 }}>{p.emoji}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: C.ocean }}>{p.label}</div>
-                  <div style={{ fontSize: 12, color: C.gray, marginTop: 2 }}>{p.desc}</div>
-                </div>
-              </button>
-            ))}
+        {step === "senha" && (
+          <div>
+            <div style={{ fontSize: 13, color: C.gray, marginBottom: 16, textAlign: "center" }}>
+              Login: <strong style={{ color: C.ocean }}>{email}</strong>
+            </div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: C.ocean, display: "block", marginBottom: 6 }}>
+              Senha
+            </label>
+            <input
+              type="password"
+              placeholder="Sua senha"
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              autoFocus
+              style={{
+                width: "100%", padding: "14px 16px", borderRadius: 12,
+                border: "1.5px solid #E0E6EB", fontSize: 15, outline: "none",
+                marginBottom: 16, fontFamily: fonts.body
+              }}
+            />
+            <div style={{ fontSize: 11, color: C.gray, marginBottom: 16, textAlign: "center" }}>
+              Senha de teste: <strong>123456</strong>
+            </div>
+            <button
+              onClick={handleLogin}
+              disabled={!senha || carregando}
+              style={{
+                width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
+                background: senha ? C.aqua : "#d5dde5",
+                color: senha ? C.white : C.gray,
+                fontSize: 15, fontWeight: 700, fontFamily: fonts.display,
+                cursor: senha ? "pointer" : "not-allowed"
+              }}>
+              {carregando ? "Entrando..." : "Entrar →"}
+            </button>
+            <button
+              onClick={() => { setStep("inicio"); setErro(""); }}
+              style={{
+                width: "100%", padding: "10px 0", marginTop: 8,
+                background: "transparent", border: "none",
+                color: C.gray, fontSize: 13, cursor: "pointer"
+              }}>
+              ← Voltar
+            </button>
           </div>
         )}
       </div>
