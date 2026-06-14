@@ -80,7 +80,7 @@ export default function Landing({ onStart }) {
             "M0 30 Q180 70 360 30 Q540 -10 720 30 Q900 70 1080 30 Q1260 -10 1440 30 L1440 80 L0 80Z"
           ].map((d, i) => (
             <svg key={i} className="wave-path" viewBox="0 0 1440 80" fill="none" style={{
-              position: "absolute", bottom: 0, width: "200%",
+              position: "absolute", width: "200%",
               animation: `waveMove ${[8, 12, 16][i]}s linear infinite`,
               animationDirection: i === 1 ? "reverse" : "normal",
               opacity: [1, 0.4, 0.2][i],
@@ -242,7 +242,7 @@ export default function Landing({ onStart }) {
                 ))}
               </ul>
               <button onClick={p.featured ? onStart : undefined} style={{
-                width: "100%", padding: "13px 0", borderRadius: 12, fontFamily: fonts.display, fontSize: 15, fontWeight: 700, cursor: "pointer", border: "none",
+                width: "100%", padding: "13px 0", borderRadius: 12, fontFamily: fonts.display, fontSize: 15, fontWeight: 700, cursor: "pointer",
                 background: p.featured ? C.ocean : "transparent",
                 color: p.featured ? C.white : "rgba(255,255,255,0.7)",
                 border: p.featured ? "none" : "1.5px solid rgba(255,255,255,0.2)"

@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "BORDO. - Gestao Nautica para quem trabalha no mar",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite",
     "dev:server": "node server/index.cjs",
