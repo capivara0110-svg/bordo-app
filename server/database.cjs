@@ -1,4 +1,4 @@
-﻿const bcrypt = require("bcryptjs");
+const bcrypt = require("bcryptjs");
 const pgUrl = process.env.DATABASE_URL || process.env.PG_URL;
 
 let db;
