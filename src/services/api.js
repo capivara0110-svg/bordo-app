@@ -1,4 +1,4 @@
-const API = "http://localhost:3001/api";
+const API = import.meta.env.VITE_API_URL || "/api";
 
 // ─── CLIENTE HTTP ───────────────────────────────────────
 async function request(path, options = {}) {

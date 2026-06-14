@@ -5,17 +5,17 @@ const auth = require("../middleware.cjs");
 const router = express.Router();
 
 // GET /api/bercos
-router.get("/", auth, (req, res) => {
-  const bercos = db.prepare("SELECT * FROM bercos ORDER BY numero").all();
+router.get("/", auth, async (req, res) => {
+  const bercos = await db.prepare("SELECT * FROM bercos ORDER BY numero").all();
   res.json(bercos);
 });
 
 // PUT /api/bercos/:id
-router.put("/:id", auth, (req, res) => {
+router.put("/:id", auth, async (req, res) => {
   const { embarcacao, cliente, status, entrada, saida } = req.body;
-  db.prepare(
+  await db.prepare(
     "UPDATE bercos SET embarcacao = ?, cliente = ?, status = ?, entrada = ?, saida = ? WHERE id = ?"
-  ).run(embarcacao || "—", cliente || "—", status || "livre", entrada || "—", saida || "—", req.params.id);
+  ).run(embarcacao || "â€”", cliente || "â€”", status || "livre", entrada || "â€”", saida || "â€”", req.params.id);
   res.json({ ok: true });
 });
 

@@ -6,3 +6,8 @@ dist/
 .env.local
 .env.*.local
 .vercel
+server/*.db
+server/*.db-shm
+server/*.db-wal
+server/idx_*
+server/*_tmp.js

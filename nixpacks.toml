@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs", "python3", "gcc", "gnumake"]
 
 [phases.install]
-cmds = ["cd server && npm install"]
+cmds = ["npm ci", "cd server && npm ci"]
 
 [phases.build]
-cmds = ["cd server && npm install"]
+cmds = ["npm run build"]
 
 [start]
 cmd = "cd server && node index.cjs"

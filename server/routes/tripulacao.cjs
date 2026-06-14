@@ -5,17 +5,17 @@ const auth = require("../middleware.cjs");
 const router = express.Router();
 
 // GET /api/tripulacao
-router.get("/", auth, (req, res) => {
-  const membros = db.prepare("SELECT * FROM tripulacao ORDER BY nome").all();
+router.get("/", auth, async (req, res) => {
+  const membros = await db.prepare("SELECT * FROM tripulacao ORDER BY nome").all();
   res.json(membros);
 });
 
 // POST /api/tripulacao
-router.post("/", auth, (req, res) => {
+router.post("/", auth, async (req, res) => {
   const { nome, cargo, habilitacao, certificado, avatar } = req.body;
-  if (!nome || !cargo) return res.status(400).json({ erro: "Nome e cargo obrigatórios" });
+  if (!nome || !cargo) return res.status(400).json({ erro: "Nome e cargo obrigatÃ³rios" });
 
-  const result = db.prepare(
+  const result = await db.prepare(
     "INSERT INTO tripulacao (nome, cargo, habilitacao, certificado, avatar) VALUES (?, ?, ?, ?, ?)"
   ).run(nome, cargo, habilitacao || "", certificado || "", avatar || "??");
 
@@ -23,9 +23,9 @@ router.post("/", auth, (req, res) => {
 });
 
 // PUT /api/tripulacao/:id
-router.put("/:id", auth, (req, res) => {
+router.put("/:id", auth, async (req, res) => {
   const { nome, cargo, habilitacao, certificado, status } = req.body;
-  db.prepare(
+  await db.prepare(
     "UPDATE tripulacao SET nome = ?, cargo = ?, habilitacao = ?, certificado = ?, status = ? WHERE id = ?"
   ).run(nome, cargo, habilitacao, certificado, status, req.params.id);
   res.json({ ok: true });
