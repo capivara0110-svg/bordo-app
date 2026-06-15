@@ -5,7 +5,8 @@
   "description": "BORDO. API Server",
   "main": "index.cjs",
   "scripts": {
-    "start": "node index.cjs"
+    "start": "node index.cjs",
+    "test": "node --test tests/*.test.cjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

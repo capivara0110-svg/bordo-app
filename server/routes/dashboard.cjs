@@ -4,27 +4,50 @@ const auth = require("../middleware.cjs");
 
 const router = express.Router();
 
-// GET /api/dashboard - dados consolidados para o gestor
+async function count(sql, empresaId, ...params) {
+  const row = await db.prepare(sql).get(empresaId, ...params);
+  return Number(row.total);
+}
+
 router.get("/", auth, async (req, res) => {
-  const totalOS = Number((await db.prepare("SELECT COUNT(*) as total FROM ordens_servico").get()).total);
-  const osAtivas = Number((await db.prepare("SELECT COUNT(*) as total FROM ordens_servico WHERE status != 'concluida'").get()).total);
-  const totalBercos = Number((await db.prepare("SELECT COUNT(*) as total FROM bercos").get()).total);
-  const bercosOcupados = Number((await db.prepare("SELECT COUNT(*) as total FROM bercos WHERE status = 'ocupado'").get()).total);
-  const totalEquipe = Number((await db.prepare("SELECT COUNT(*) as total FROM tripulacao").get()).total);
-  const totalEstoque = Number((await db.prepare("SELECT COUNT(*) as total FROM estoque").get()).total);
-  const estoqueBaixo = Number((await db.prepare("SELECT COUNT(*) as total FROM estoque WHERE quantidade < minimo").get()).total);
-  const notificacoesNaoLidas = Number((await db.prepare("SELECT COUNT(*) as total FROM notificacoes WHERE usuario_id = ? AND lida = 0").get(req.usuario.id)).total);
+  const empresaId = req.usuario.empresa_id;
+  const [
+    totalOS,
+    osAtivas,
+    totalBercos,
+    bercosOcupados,
+    totalEquipe,
+    totalEstoque,
+    estoqueBaixo,
+    notificacoesNaoLidas,
+  ] = await Promise.all([
+    count("SELECT COUNT(*) AS total FROM ordens_servico WHERE empresa_id = ?", empresaId),
+    count("SELECT COUNT(*) AS total FROM ordens_servico WHERE empresa_id = ? AND status != 'concluida'", empresaId),
+    count("SELECT COUNT(*) AS total FROM bercos WHERE empresa_id = ?", empresaId),
+    count("SELECT COUNT(*) AS total FROM bercos WHERE empresa_id = ? AND status = 'ocupado'", empresaId),
+    count("SELECT COUNT(*) AS total FROM tripulacao WHERE empresa_id = ?", empresaId),
+    count("SELECT COUNT(*) AS total FROM estoque WHERE empresa_id = ?", empresaId),
+    count("SELECT COUNT(*) AS total FROM estoque WHERE empresa_id = ? AND quantidade < minimo", empresaId),
+    count(
+      "SELECT COUNT(*) AS total FROM notificacoes WHERE empresa_id = ? AND usuario_id = ? AND lida = 0",
+      empresaId,
+      req.usuario.id,
+    ),
+  ]);
 
-  // Últimas OS
-  const ultimasOS = await db.prepare("SELECT * FROM ordens_servico ORDER BY criado_em DESC LIMIT 5").all();
+  const ultimasOS = await db.prepare(
+    `SELECT * FROM ordens_servico
+     WHERE empresa_id = ?
+     ORDER BY criado_em DESC LIMIT 5`,
+  ).all(empresaId);
 
-  res.json({
+  return res.json({
     os: { total: totalOS, ativas: osAtivas },
     bercos: { total: totalBercos, ocupados: bercosOcupados },
     equipe: { total: totalEquipe },
     estoque: { total: totalEstoque, baixo: estoqueBaixo },
     notificacoes: { naoLidas: notificacoesNaoLidas },
-    ultimasOS
+    ultimasOS,
   });
 });
 

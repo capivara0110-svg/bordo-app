@@ -12,6 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/auth", require("./routes/auth.cjs"));
+app.use("/api/empresa", require("./routes/empresa.cjs"));
 app.use("/api/diario", require("./routes/diario.cjs"));
 app.use("/api/checklist", require("./routes/checklist.cjs"));
 app.use("/api/tripulacao", require("./routes/tripulacao.cjs"));

@@ -64,6 +64,12 @@ export default function App() {
       },
       userId: userData.user.id,
       email: userData.user.email,
+      company: {
+        id: userData.user.empresa_id,
+        name: userData.user.empresa_nome,
+        plan: userData.user.empresa_plano,
+      },
+      accessRole: userData.user.papel,
     };
 
     navigate("home", profileData);

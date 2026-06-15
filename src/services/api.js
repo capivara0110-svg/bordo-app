@@ -34,14 +34,29 @@ export const api = {
     }),
 
   // Registro
-  registro: (nome, email, senha, perfil) =>
+  registro: (nome, nomeEmpresa, email, senha) =>
     request("/auth/registro", {
       method: "POST",
-      body: JSON.stringify({ nome, email, senha, perfil }),
+      body: JSON.stringify({ nome, nome_empresa: nomeEmpresa, email, senha }),
     }),
 
   // Meus dados
   me: () => request("/auth/me"),
+
+  empresa: {
+    dados: () => request("/empresa"),
+    membros: () => request("/empresa/membros"),
+    criarMembro: (dados) =>
+      request("/empresa/membros", {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
+    alterarPapel: (id, papel) =>
+      request(`/empresa/membros/${id}/papel`, {
+        method: "PUT",
+        body: JSON.stringify({ papel }),
+      }),
+  },
 
   // ─── DIÁRIO ──────────────────────────────────────────
   diario: {

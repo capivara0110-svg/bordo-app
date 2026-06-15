@@ -2,55 +2,128 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("../database.cjs");
+const auth = require("../middleware.cjs");
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "bordo-secret-key-2026";
 
-// POST /api/auth/login
+function createToken(user) {
+  return jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+function publicUser(user) {
+  const { senha, ...safeUser } = user;
+  return safeUser;
+}
+
+function slugify(value) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48) || "empresa";
+}
+
+async function uniqueSlug(name) {
+  const base = slugify(name);
+  let slug = base;
+  let suffix = 2;
+  while (await db.prepare("SELECT id FROM empresas WHERE slug = ?").get(slug)) {
+    slug = `${base}-${suffix++}`;
+  }
+  return slug;
+}
+
 router.post("/login", async (req, res) => {
-  const { email, senha } = req.body;
-  if (!email || !senha) return res.status(400).json({ erro: "Email e senha obrigatórios" });
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const senha = String(req.body.senha || "");
+  if (!email || !senha) {
+    return res.status(400).json({ erro: "Email e senha obrigatorios" });
+  }
 
-  const user = await db.prepare("SELECT * FROM usuarios WHERE email = ?").get(email);
-  if (!user) return res.status(401).json({ erro: "Usuário não encontrado" });
+  const user = await db.prepare(
+    `SELECT u.*, e.nome AS empresa_nome, e.plano AS empresa_plano, e.ativo AS empresa_ativa
+     FROM usuarios u
+     JOIN empresas e ON e.id = u.empresa_id
+     WHERE u.email = ?`,
+  ).get(email);
 
-  const senhaOk = bcrypt.compareSync(senha, user.senha);
-  if (!senhaOk) return res.status(401).json({ erro: "Senha incorreta" });
+  if (!user || !bcrypt.compareSync(senha, user.senha)) {
+    return res.status(401).json({ erro: "Email ou senha incorretos" });
+  }
+  if (!Number(user.empresa_ativa)) {
+    return res.status(403).json({ erro: "Empresa desativada" });
+  }
 
-  const token = jwt.sign({ id: user.id, perfil: user.perfil }, JWT_SECRET, { expiresIn: "7d" });
-  const { senha: _, ...userData } = user;
-
-  res.json({ token, user: userData });
+  return res.json({ token: createToken(user), user: publicUser(user) });
 });
 
-// POST /api/auth/registro
 router.post("/registro", async (req, res) => {
-  const { nome, email, senha, perfil } = req.body;
-  if (!nome || !email || !senha) return res.status(400).json({ erro: "Nome, email e senha obrigatórios" });
+  const nome = String(req.body.nome || "").trim();
+  const nomeEmpresa = String(req.body.nome_empresa || req.body.nomeEmpresa || "").trim();
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const senha = String(req.body.senha || "");
 
-  const existe = await db.prepare("SELECT id FROM usuarios WHERE email = ?").get(email);
-  if (existe) return res.status(409).json({ erro: "Email já cadastrado" });
+  if (!nome || !nomeEmpresa || !email || !senha) {
+    return res.status(400).json({
+      erro: "Nome, empresa, email e senha sao obrigatorios",
+    });
+  }
+  if (senha.length < 8) {
+    return res.status(400).json({ erro: "A senha deve ter pelo menos 8 caracteres" });
+  }
+  if (await db.prepare("SELECT id FROM usuarios WHERE email = ?").get(email)) {
+    return res.status(409).json({ erro: "Email ja cadastrado" });
+  }
 
-  const hash = bcrypt.hashSync(senha, 10);
-  const avatarMap = { marinheiro: "MAR", marinharia: "MNH", tecnico: "TEC", gestor: "GST" };
+  const slug = await uniqueSlug(nomeEmpresa);
+  const empresaResult = await db.prepare(
+    "INSERT INTO empresas (nome, slug, plano) VALUES (?, ?, ?)",
+  ).run(nomeEmpresa, slug, "trial");
 
-  const result = await db.prepare(
-    "INSERT INTO usuarios (nome, email, senha, perfil, avatar) VALUES (?, ?, ?, ?, ?)"
-  ).run(nome, email, hash, perfil || "marinheiro", avatarMap[perfil] || "MAR");
+  try {
+    const hash = bcrypt.hashSync(senha, 12);
+    const userResult = await db.prepare(
+      `INSERT INTO usuarios
+       (empresa_id,nome,email,senha,perfil,papel,avatar,cargo)
+       VALUES (?,?,?,?,?,?,?,?)`,
+    ).run(
+      empresaResult.lastInsertRowid,
+      nome,
+      email,
+      hash,
+      "gestor",
+      "proprietario",
+      "GST",
+      "Proprietario",
+    );
 
-  const token = jwt.sign({ id: result.lastInsertRowid, perfil: perfil || "marinheiro" }, JWT_SECRET, { expiresIn: "7d" });
+    const user = await db.prepare(
+      `SELECT u.*, e.nome AS empresa_nome, e.plano AS empresa_plano
+       FROM usuarios u JOIN empresas e ON e.id = u.empresa_id
+       WHERE u.id = ?`,
+    ).get(userResult.lastInsertRowid);
 
-  res.status(201).json({
-    token,
-    user: { id: result.lastInsertRowid, nome, email, perfil: perfil || "marinheiro", avatar: avatarMap[perfil] || "MAR" }
-  });
+    return res.status(201).json({ token: createToken(user), user: publicUser(user) });
+  } catch (error) {
+    await db.prepare("DELETE FROM empresas WHERE id = ?").run(empresaResult.lastInsertRowid);
+    throw error;
+  }
 });
 
-// GET /api/auth/me - dados do usuário logado
-router.get("/me", require("../middleware.cjs"), async (req, res) => {
-  const user = await db.prepare("SELECT id, nome, email, perfil, avatar, cargo, embarcacao FROM usuarios WHERE id = ?").get(req.usuario.id);
-  if (!user) return res.status(404).json({ erro: "Usuário não encontrado" });
-  res.json(user);
+router.get("/me", auth, async (req, res) => {
+  const user = await db.prepare(
+    `SELECT u.id, u.empresa_id, u.nome, u.email, u.perfil, u.papel,
+            u.avatar, u.cargo, u.embarcacao,
+            e.nome AS empresa_nome, e.slug AS empresa_slug, e.plano AS empresa_plano
+     FROM usuarios u
+     JOIN empresas e ON e.id = u.empresa_id
+     WHERE u.id = ?`,
+  ).get(req.usuario.id);
+
+  return res.json(user);
 });
 
 module.exports = router;

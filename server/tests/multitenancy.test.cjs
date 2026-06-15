@@ -1,0 +1,136 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
+
+const projectRoot = path.resolve(__dirname, "..", "..");
+const port = 32000 + Math.floor(Math.random() * 1000);
+const baseUrl = `http://127.0.0.1:${port}/api`;
+const dbPath = path.join(os.tmpdir(), `bordo-test-${process.pid}-${Date.now()}.db`);
+let server;
+
+async function request(pathname, options = {}, token) {
+  const response = await fetch(`${baseUrl}${pathname}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+  const body = await response.json();
+  return { status: response.status, body };
+}
+
+async function waitForServer() {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      const response = await fetch(`${baseUrl}/health`);
+      if (response.ok) return;
+    } catch {
+      // Server is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error("Servidor de teste nao iniciou");
+}
+
+test.before(async () => {
+  server = spawn(process.execPath, ["server/index.cjs"], {
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      BORDO_DB_PATH: dbPath,
+      DATABASE_URL: "",
+      PG_URL: "",
+      JWT_SECRET: "test-secret",
+    },
+    stdio: "ignore",
+  });
+  await waitForServer();
+});
+
+test.after(async () => {
+  if (server && !server.killed) {
+    server.kill();
+    await new Promise((resolve) => server.once("exit", resolve));
+  }
+  for (const suffix of ["", "-shm", "-wal"]) {
+    try {
+      fs.rmSync(`${dbPath}${suffix}`, { force: true });
+    } catch {
+      // Windows can briefly retain a SQLite file handle after process exit.
+    }
+  }
+});
+
+test("isola dados entre empresas e aplica permissoes", async () => {
+  const stamp = Date.now();
+  const first = await request("/auth/registro", {
+    method: "POST",
+    body: JSON.stringify({
+      nome: "Dono Um",
+      nome_empresa: "Marina Um",
+      email: `dono1-${stamp}@teste.local`,
+      senha: "senha-segura-1",
+    }),
+  });
+  const second = await request("/auth/registro", {
+    method: "POST",
+    body: JSON.stringify({
+      nome: "Dono Dois",
+      nome_empresa: "Marina Dois",
+      email: `dono2-${stamp}@teste.local`,
+      senha: "senha-segura-2",
+    }),
+  });
+
+  assert.equal(first.status, 201);
+  assert.equal(second.status, 201);
+  assert.notEqual(first.body.user.empresa_id, second.body.user.empresa_id);
+
+  const createdOrder = await request("/ordens", {
+    method: "POST",
+    body: JSON.stringify({ embarcacao: "Lancha Privada", tipo: "Revisao" }),
+  }, first.body.token);
+  assert.equal(createdOrder.status, 201);
+
+  const firstOrders = await request("/ordens", {}, first.body.token);
+  const secondOrders = await request("/ordens", {}, second.body.token);
+  assert.equal(firstOrders.body.length, 1);
+  assert.equal(secondOrders.body.length, 0);
+
+  const crossTenantUpdate = await request(`/ordens/${createdOrder.body.id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "concluida" }),
+  }, second.body.token);
+  assert.equal(crossTenantUpdate.status, 404);
+
+  const memberEmail = `membro-${stamp}@teste.local`;
+  const member = await request("/empresa/membros", {
+    method: "POST",
+    body: JSON.stringify({
+      nome: "Membro Um",
+      email: memberEmail,
+      senha: "senha-membro-1",
+      perfil: "marinheiro",
+      papel: "membro",
+    }),
+  }, first.body.token);
+  assert.equal(member.status, 201);
+
+  const memberLogin = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: memberEmail, senha: "senha-membro-1" }),
+  });
+  assert.equal(memberLogin.status, 200);
+
+  const deniedStockWrite = await request("/estoque", {
+    method: "POST",
+    body: JSON.stringify({ nome: "Item restrito", quantidade: 1 }),
+  }, memberLogin.body.token);
+  assert.equal(deniedStockWrite.status, 403);
+});
