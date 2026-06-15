@@ -193,6 +193,10 @@ async function migrateTenantColumns() {
   }
 }
 
+async function migratePlanColumns() {
+  await addColumn("empresas", "trial_termina_em TIMESTAMP");
+}
+
 async function seed() {
   const count = await get("SELECT COUNT(*) AS total FROM usuarios");
   if (Number(count.total) > 0) return;
@@ -325,6 +329,17 @@ async function initialize() {
     await run(
       "INSERT INTO schema_migrations (version) VALUES (?)",
       ["001_multi_tenant"],
+    );
+  }
+  const planMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["002_plan_limits"],
+  );
+  if (!planMigration) {
+    await migratePlanColumns();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["002_plan_limits"],
     );
   }
   await seed();
