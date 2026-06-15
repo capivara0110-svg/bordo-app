@@ -86,6 +86,7 @@ async function createSchema() {
     `CREATE TABLE IF NOT EXISTS empresas (
       id ${id}, nome TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
       plano TEXT NOT NULL DEFAULT 'trial', ativo INTEGER NOT NULL DEFAULT 1,
+      trial_termina_em TIMESTAMP,
       criado_em TIMESTAMP DEFAULT ${now}
     )`,
     `CREATE TABLE IF NOT EXISTS usuarios (
@@ -139,6 +140,7 @@ async function createSchema() {
 }
 
 async function migrateTenantColumns() {
+  await addColumn("empresas", "trial_termina_em TIMESTAMP");
   await addColumn("usuarios", "empresa_id INTEGER");
   await addColumn("usuarios", "papel TEXT NOT NULL DEFAULT 'membro'");
 

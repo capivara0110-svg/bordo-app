@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("../database.cjs");
 const auth = require("../middleware.cjs");
+const { trialEndsAt } = require("../planos.cjs");
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "bordo-secret-key-2026";
@@ -44,7 +45,8 @@ router.post("/login", async (req, res) => {
   }
 
   const user = await db.prepare(
-    `SELECT u.*, e.nome AS empresa_nome, e.plano AS empresa_plano, e.ativo AS empresa_ativa
+    `SELECT u.*, e.nome AS empresa_nome, e.plano AS empresa_plano,
+            e.ativo AS empresa_ativa, e.trial_termina_em AS empresa_trial_termina_em
      FROM usuarios u
      JOIN empresas e ON e.id = u.empresa_id
      WHERE u.email = ?`,
@@ -80,8 +82,8 @@ router.post("/registro", async (req, res) => {
 
   const slug = await uniqueSlug(nomeEmpresa);
   const empresaResult = await db.prepare(
-    "INSERT INTO empresas (nome, slug, plano) VALUES (?, ?, ?)",
-  ).run(nomeEmpresa, slug, "trial");
+    "INSERT INTO empresas (nome, slug, plano, trial_termina_em) VALUES (?, ?, ?, ?)",
+  ).run(nomeEmpresa, slug, "trial", trialEndsAt());
 
   try {
     const hash = bcrypt.hashSync(senha, 12);
@@ -101,7 +103,8 @@ router.post("/registro", async (req, res) => {
     );
 
     const user = await db.prepare(
-      `SELECT u.*, e.nome AS empresa_nome, e.plano AS empresa_plano
+      `SELECT u.*, e.nome AS empresa_nome, e.plano AS empresa_plano,
+              e.trial_termina_em AS empresa_trial_termina_em
        FROM usuarios u JOIN empresas e ON e.id = u.empresa_id
        WHERE u.id = ?`,
     ).get(userResult.lastInsertRowid);
@@ -117,7 +120,8 @@ router.get("/me", auth, async (req, res) => {
   const user = await db.prepare(
     `SELECT u.id, u.empresa_id, u.nome, u.email, u.perfil, u.papel,
             u.avatar, u.cargo, u.embarcacao,
-            e.nome AS empresa_nome, e.slug AS empresa_slug, e.plano AS empresa_plano
+            e.nome AS empresa_nome, e.slug AS empresa_slug, e.plano AS empresa_plano,
+            e.trial_termina_em AS empresa_trial_termina_em
      FROM usuarios u
      JOIN empresas e ON e.id = u.empresa_id
      WHERE u.id = ?`,

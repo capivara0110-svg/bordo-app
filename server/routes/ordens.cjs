@@ -2,6 +2,7 @@ const express = require("express");
 const db = require("../database.cjs");
 const auth = require("../middleware.cjs");
 const { requireAccess } = require("../middleware.cjs");
+const { requirePlanoAtivo, requireLimite } = require("../planos.cjs");
 
 const router = express.Router();
 const canManage = requireAccess({
@@ -26,7 +27,7 @@ router.get("/", auth, async (req, res) => {
   return res.json(result);
 });
 
-router.post("/", auth, canManage, async (req, res) => {
+router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"), async (req, res) => {
   const { embarcacao, cliente, tipo, prioridade, descricao, responsavel, previsao } = req.body;
   if (!embarcacao) {
     return res.status(400).json({ erro: "Embarcacao obrigatoria" });
@@ -67,7 +68,7 @@ router.post("/", auth, canManage, async (req, res) => {
   });
 });
 
-router.put("/:id/status", auth, canManage, async (req, res) => {
+router.put("/:id/status", auth, canManage, requirePlanoAtivo, async (req, res) => {
   const allowed = ["aguardando", "em_andamento", "concluida", "cancelada"];
   if (!allowed.includes(req.body.status)) {
     return res.status(400).json({ erro: "Status invalido" });
@@ -81,7 +82,7 @@ router.put("/:id/status", auth, canManage, async (req, res) => {
   return res.json({ ok: true });
 });
 
-router.put("/:id/tarefa/:tarefaId", auth, canManage, async (req, res) => {
+router.put("/:id/tarefa/:tarefaId", auth, canManage, requirePlanoAtivo, async (req, res) => {
   const tarefa = await db.prepare(
     `SELECT t.done
      FROM os_tarefas t

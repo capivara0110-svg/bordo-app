@@ -91,6 +91,12 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   assert.equal(first.status, 201);
   assert.equal(second.status, 201);
   assert.notEqual(first.body.user.empresa_id, second.body.user.empresa_id);
+  assert.ok(first.body.user.empresa_trial_termina_em);
+
+  const firstCompany = await request("/empresa", {}, first.body.token);
+  assert.equal(firstCompany.status, 200);
+  assert.equal(firstCompany.body.assinatura.plano, "trial");
+  assert.equal(firstCompany.body.assinatura.limites.usuarios, 3);
 
   const createdOrder = await request("/ordens", {
     method: "POST",
@@ -121,6 +127,31 @@ test("isola dados entre empresas e aplica permissoes", async () => {
     }),
   }, first.body.token);
   assert.equal(member.status, 201);
+
+  const secondMember = await request("/empresa/membros", {
+    method: "POST",
+    body: JSON.stringify({
+      nome: "Membro Dois",
+      email: `membro2-${stamp}@teste.local`,
+      senha: "senha-membro-2",
+      perfil: "marinheiro",
+      papel: "membro",
+    }),
+  }, first.body.token);
+  assert.equal(secondMember.status, 201);
+
+  const overUserLimit = await request("/empresa/membros", {
+    method: "POST",
+    body: JSON.stringify({
+      nome: "Membro Tres",
+      email: `membro3-${stamp}@teste.local`,
+      senha: "senha-membro-3",
+      perfil: "marinheiro",
+      papel: "membro",
+    }),
+  }, first.body.token);
+  assert.equal(overUserLimit.status, 403);
+  assert.equal(overUserLimit.body.codigo, "LIMITE_PLANO");
 
   const memberLogin = await request("/auth/login", {
     method: "POST",

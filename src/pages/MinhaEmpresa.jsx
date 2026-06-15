@@ -26,6 +26,12 @@ const profileLabels = {
   marinheiro: "Tripulacao",
 };
 
+const metricLabels = {
+  usuarios: "Usuarios",
+  ordensMes: "OS no mes",
+  diarioMes: "Diario no mes",
+};
+
 export default function MinhaEmpresa({ profile, onBack }) {
   const [company, setCompany] = useState(null);
   const [members, setMembers] = useState([]);
@@ -118,13 +124,30 @@ export default function MinhaEmpresa({ profile, onBack }) {
               <div style={{ textAlign: "right" }}>
                 <div style={{ ...eyebrowStyle, color: C.gold }}>Plano atual</div>
                 <div style={{ color: C.white, fontWeight: 800, textTransform: "capitalize", marginTop: 5 }}>
-                  {company.plano}
+                  {company.assinatura?.nome || company.plano}
                 </div>
-                <div style={{ color: C.green, fontSize: 11, marginTop: 4 }}>
-                  {Number(company.ativo) ? "Conta ativa" : "Conta suspensa"}
+                <div style={{
+                  color: company.assinatura?.ativo ? C.green : "#ffaaa2",
+                  fontSize: 11,
+                  marginTop: 4,
+                }}>
+                  {company.assinatura?.ativo ? trialText(company.assinatura) : "Plano inativo"}
                 </div>
               </div>
             </section>
+
+            {company.assinatura && (
+              <section style={{ ...cardStyle, alignItems: "stretch", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", marginTop: 12 }}>
+                {Object.entries(metricLabels).map(([key, label]) => (
+                  <PlanMetric
+                    key={key}
+                    label={label}
+                    used={company.assinatura.uso[key]}
+                    limit={company.assinatura.limites[key]}
+                  />
+                ))}
+              </section>
+            )}
 
             <section style={{ marginTop: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", marginBottom: 12 }}>
@@ -247,6 +270,39 @@ function Alert({ tone, children }) {
 
 function StateMessage({ children }) {
   return <div style={{ padding: 40, color: "rgba(255,255,255,0.4)", textAlign: "center" }}>{children}</div>;
+}
+
+function PlanMetric({ label, used, limit }) {
+  const unlimited = limit === null || limit === undefined;
+  const percent = unlimited ? 8 : Math.min((used / Math.max(limit, 1)) * 100, 100);
+  const isFull = !unlimited && used >= limit;
+
+  return (
+    <div>
+      <div style={{ ...eyebrowStyle, color: isFull ? "#ffaaa2" : C.aqua }}>{label}</div>
+      <div style={{ color: C.white, fontSize: 18, fontWeight: 800, marginTop: 5 }}>
+        {used}<span style={{ color: "rgba(255,255,255,0.38)", fontSize: 12 }}>/{unlimited ? "ilimitado" : limit}</span>
+      </div>
+      <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.08)", marginTop: 9, overflow: "hidden" }}>
+        <div style={{
+          width: `${percent}%`,
+          height: "100%",
+          borderRadius: 999,
+          background: isFull ? "#ffaaa2" : C.aqua,
+        }} />
+      </div>
+    </div>
+  );
+}
+
+function trialText(assinatura) {
+  if (assinatura.plano !== "trial") return "Conta ativa";
+  if (!assinatura.trial_termina_em) return "Teste ativo";
+
+  const diff = new Date(assinatura.trial_termina_em).getTime() - Date.now();
+  const days = Math.ceil(diff / 86400000);
+  if (days <= 0) return "Teste expirado";
+  return `${days} dias de teste`;
 }
 
 const cardStyle = {

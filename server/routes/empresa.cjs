@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const db = require("../database.cjs");
 const auth = require("../middleware.cjs");
 const { requireRoles } = require("../middleware.cjs");
+const { getResumoPlano, requireLimite } = require("../planos.cjs");
 
 const router = express.Router();
 const canManage = requireRoles("proprietario", "gestor");
@@ -11,9 +12,9 @@ const validProfiles = ["gestor", "tecnico", "marinharia", "marinheiro"];
 
 router.get("/", auth, async (req, res) => {
   const empresa = await db.prepare(
-    "SELECT id, nome, slug, plano, ativo, criado_em FROM empresas WHERE id = ?",
+    "SELECT id, nome, slug, plano, ativo, trial_termina_em, criado_em FROM empresas WHERE id = ?",
   ).get(req.usuario.empresa_id);
-  return res.json(empresa);
+  return res.json({ ...empresa, assinatura: await getResumoPlano(req.usuario.empresa_id) });
 });
 
 router.get("/membros", auth, canManage, async (req, res) => {
@@ -26,7 +27,7 @@ router.get("/membros", auth, canManage, async (req, res) => {
   return res.json(membros);
 });
 
-router.post("/membros", auth, canManage, async (req, res) => {
+router.post("/membros", auth, canManage, requireLimite("usuarios"), async (req, res) => {
   const nome = String(req.body.nome || "").trim();
   const email = String(req.body.email || "").trim().toLowerCase();
   const senha = String(req.body.senha || "");
