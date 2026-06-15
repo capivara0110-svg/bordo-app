@@ -4,7 +4,7 @@ import { api } from "../services/api.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import Header from "../components/Header.jsx";
 
-export default function GestorMarina({ profile, onLogout }) {
+export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [tab, setTab] = useState("dashboard");
 
   // Dados da API
@@ -176,7 +176,7 @@ export default function GestorMarina({ profile, onLogout }) {
 
   return (
     <div style={{ minHeight: "100vh", background: C.ocean, paddingBottom: 80, maxWidth: 480, margin: "0 auto", position: "relative" }}>
-      <Header title="Marina São Paulo" sub="Painel do Gestor" color={C.green} />
+      <Header title={profile.company?.name || "Minha empresa"} sub="Painel do Gestor" color={C.green} />
       {renderTab()}
 
       <div style={{
@@ -198,6 +198,13 @@ export default function GestorMarina({ profile, onLogout }) {
             <span style={{ fontSize: 10, fontWeight: 700, color: C.white, letterSpacing: 0.5 }}>{t.label}</span>
           </button>
         ))}
+        <button onClick={onCompany} style={{
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+          background: "transparent", border: "none", cursor: "pointer", padding: "6px 12px", opacity: 0.55
+        }}>
+          <span style={{ fontSize: 20 }}>🏢</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.white }}>Empresa</span>
+        </button>
         <button onClick={onLogout} style={{
           display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
           background: "transparent", border: "none", cursor: "pointer", padding: "6px 12px", opacity: 0.4
