@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Náutico Pro — Identidade de Marca</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ocean:    #0A2540;
+    --wave:     #1B4F72;
+    --aqua:     #17A8BD;
+    --aqua-lt:  #5ECFDE;
+    --foam:     #E4F4F8;
+    --sand:     #F7F3EC;
+    --rust:     #C0392B;
+    --gold:     #F39C12;
+    --white:    #FFFFFF;
+    --gray:     #6B7B8D;
+    --lg:       #D5DDE5;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--sand);
+    color: var(--ocean);
+  }
+
+  h1, h2, h3, .display { font-family: 'Space Grotesk', sans-serif; }
+
+  /* ── HERO ── */
+  .hero {
+    background: var(--ocean);
+    padding: 64px 32px 80px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 60% 0%, rgba(23,168,189,0.18) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--aqua);
+    margin-bottom: 32px;
+  }
+  .hero-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(13px, 2vw, 16px);
+    font-weight: 500;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 8px;
+  }
+  .hero-sub {
+    font-size: 14px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 16px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+  }
+
+  /* ── SECTION ── */
+  .section {
+    padding: 56px 32px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--aqua);
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--ocean);
+    margin-bottom: 32px;
+  }
+  .divider {
+    border: none;
+    border-top: 1px solid var(--lg);
+    margin: 0;
+  }
+
+  /* ── NOME OPTIONS ── */
+  .name-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .name-card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 24px 20px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+  .name-card:hover { border-color: var(--aqua); box-shadow: 0 4px 20px rgba(23,168,189,0.12); }
+  .name-card.winner {
+    border-color: var(--aqua);
+    box-shadow: 0 4px 24px rgba(23,168,189,0.18);
+  }
+  .name-card.winner::after {
+    content: '⭐ RECOMENDADO';
+    position: absolute;
+    top: -1px; right: 16px;
+    background: var(--aqua);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    padding: 3px 8px;
+    border-radius: 0 0 6px 6px;
+  }
+  .name-big {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--ocean);
+    margin-bottom: 4px;
+  }
+  .name-big span { color: var(--aqua); }
+  .name-slogan {
+    font-size: 12px;
+    color: var(--gray);
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+  .name-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .tag {
+    background: var(--foam);
+    color: var(--wave);
+    border-radius: 20px;
+    padding: 3px 9px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag.pro { background: var(--ocean); color: #fff; }
+
+  /* ── LOGO SHOWCASE ── */
+  .logo-showcase {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .logo-tile {
+    border-radius: 16px;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-tile.dark { background: var(--ocean); }
+  .logo-tile.light { background: var(--white); border: 1px solid var(--lg); }
+  .logo-tile.aqua-bg { background: var(--aqua); }
+  .logo-tile-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .logo-tile.dark .logo-tile-label { color: rgba(255,255,255,0.4); }
+  .logo-tile.light .logo-tile-label { color: var(--gray); }
+  .logo-tile.aqua-bg .logo-tile-label { color: rgba(255,255,255,0.7); }
+
+  /* ── PALETA ── */
+  .palette-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .swatch {
+    flex: 1;
+    min-width: 100px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(10,37,64,0.10);
+  }
+  .swatch-color {
+    height: 80px;
+  }
+  .swatch-info {
+    background: var(--white);
+    padding: 10px 12px;
+  }
+  .swatch-name { font-weight: 700; font-size: 13px; color: var(--ocean); }
+  .swatch-hex { font-size: 11px; color: var(--gray); font-family: monospace; }
+  .swatch-role { font-size: 11px; color: var(--gray); margin-top: 2px; }
+
+  /* ── TIPOGRAFIA ── */
+  .type-row { margin-bottom: 24px; }
+  .type-label { font-size: 11px; color: var(--gray); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .type-sample-display {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 38px;
+    font-weight: 800;
+    color: var(--ocean);
+    line-height: 1.1;
+  }
+  .type-sample-body {
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    color: var(--gray);
+    line-height: 1.6;
+    max-width: 480px;
+  }
+  .type-sample-ui {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--aqua);
+  }
+
+  /* ── ÍCONE / SÍMBOLO ── */
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .icon-tile {
+    background: var(--white);
+    border-radius: 14px;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--lg);
+  }
+  .icon-tile-name { font-size: 12px; color: var(--gray); font-weight: 600; text-align: center; }
+
+  /* ── VOZ DA MARCA ── */
+  .voice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .voice-card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 16px;
+    border-left: 4px solid var(--lg);
+  }
+  .voice-card.yes { border-left-color: var(--aqua); }
+  .voice-card.no { border-left-color: var(--rust); }
+  .voice-header { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .voice-card.yes .voice-header { color: var(--aqua); }
+  .voice-card.no .voice-header { color: var(--rust); }
+  .voice-item { font-size: 13px; color: var(--ocean); margin-bottom: 5px; line-height: 1.4; }
+
+  /* ── APLICAÇÕES ── */
+  .app-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .app-mockup {
+    background: var(--white);
+    border-radius: 14px;
+    padding: 20px 16px;
+    border: 1px solid var(--lg);
+    font-size: 13px;
+    color: var(--gray);
+    text-align: center;
+  }
+  .app-mockup-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--gray); margin-top: 12px; }
+
+  @media (max-width: 600px) {
+    .section { padding: 40px 20px; }
+    .voice-grid { grid-template-columns: 1fr; }
+    .hero { padding: 48px 20px 56px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">Identidade de Marca</div>
+
+  <!-- Logo principal em SVG -->
+  <svg width="220" height="64" viewBox="0 0 220 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:20px">
+    <!-- Ícone âncora estilizada -->
+    <circle cx="32" cy="32" r="30" fill="#17A8BD" opacity="0.15"/>
+    <circle cx="32" cy="32" r="30" stroke="#17A8BD" stroke-width="1.5" opacity="0.4"/>
+    <!-- Âncora -->
+    <line x1="32" y1="14" x2="32" y2="50" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="22" y1="50" x2="42" y2="50" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M22 50 Q16 44 20 38" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M42 50 Q48 44 44 38" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <circle cx="32" cy="18" r="4" fill="none" stroke="#17A8BD" stroke-width="2.5"/>
+    <line x1="24" y1="24" x2="40" y2="24" stroke="#17A8BD" stroke-width="2" stroke-linecap="round"/>
+    <!-- Texto -->
+    <text x="72" y="30" font-family="Space Grotesk, sans-serif" font-size="26" font-weight="800" fill="white">BORDO</text>
+    <text x="72" y="52" font-family="Inter, sans-serif" font-size="13" font-weight="500" fill="rgba(255,255,255,0.5)" letter-spacing="4">GESTÃO NÁUTICA</text>
+  </svg>
+
+  <div class="hero-sub">
+    Sistema de gestão para quem trabalha no mar — marinheiros, técnicos e equipes de marinharia.
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- NOMES -->
+<div class="section">
+  <div class="section-label">Nomenclatura</div>
+  <div class="section-title">Opções de nome</div>
+
+  <div class="name-grid">
+
+    <div class="name-card winner">
+      <div class="name-big">BORDO<span>.</span></div>
+      <div class="name-slogan">"Tudo que acontece a bordo, num só lugar."</div>
+      <div class="name-tags">
+        <span class="tag pro">Favorito</span>
+        <span class="tag">Curto</span>
+        <span class="tag">Náutico</span>
+        <span class="tag">Memorável</span>
+      </div>
+      <p style="font-size:12px;color:var(--gray);margin-top:12px;line-height:1.5">
+        "A bordo" é o termo mais usado no universo marítimo. Simples, direto, fácil de falar e lembrar. Funciona como app e como marca.
+      </p>
+    </div>
+
+    <div class="name-card">
+      <div class="name-big">MARE<span>Pro</span></div>
+      <div class="name-slogan">"O mar é o seu escritório."</div>
+      <div class="name-tags">
+        <span class="tag">Internacional</span>
+        <span class="tag">Profissional</span>
+        <span class="tag">Expansível</span>
+      </div>
+      <p style="font-size:12px;color:var(--gray);margin-top:12px;line-height:1.5">
+        "Mare" é mar em latim e italiano — funciona bem no Brasil e abre porta pro mercado internacional. O sufixo "Pro" reforça o foco em profissional.
+      </p>
+    </div>
+
+    <div class="name-card">
+      <div class="name-big">CALADO<span>.</span></div>
+      <div class="name-slogan">"Conheça a fundo cada embarcação."</div>
+      <div class="name-tags">
+        <span class="tag">Técnico</span>
+        <span class="tag">Nicho</span>
+        <span class="tag">Criativo</span>
+      </div>
+      <p style="font-size:12px;color:var(--gray);margin-top:12px;line-height:1.5">
+        Calado é a profundidade do casco abaixo da linha d'água — termo técnico que qualquer marinheiro conhece. Diferente e com duplo sentido.
+      </p>
+    </div>
+
+    <div class="name-card">
+      <div class="name-big">PROA<span>.</span></div>
+      <div class="name-slogan">"Sempre à frente."</div>
+      <div class="name-tags">
+        <span class="tag">Dinâmico</span>
+        <span class="tag">Curto</span>
+        <span class="tag">Visual forte</span>
+      </div>
+      <p style="font-size:12px;color:var(--gray);margin-top:12px;line-height:1.5">
+        A proa é a parte dianteira do barco — simboliza ir à frente, inovar. Quatro letras, fácil de registrar e tem ótima fonética.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- LOGO -->
+<div class="section">
+  <div class="section-label">Logotipo</div>
+  <div class="section-title">Versões da marca</div>
+
+  <div class="logo-showcase">
+
+    <!-- Escuro -->
+    <div class="logo-tile dark">
+      <svg width="160" height="52" viewBox="0 0 160 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="26" cy="26" r="24" fill="#17A8BD" opacity="0.12"/>
+        <circle cx="26" cy="26" r="24" stroke="#17A8BD" stroke-width="1.2" opacity="0.35"/>
+        <line x1="26" y1="11" x2="26" y2="41" stroke="#17A8BD" stroke-width="2" stroke-linecap="round"/>
+        <line x1="17" y1="41" x2="35" y2="41" stroke="#17A8BD" stroke-width="2" stroke-linecap="round"/>
+        <path d="M17 41 Q12 36 16 31" stroke="#17A8BD" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M35 41 Q40 36 36 31" stroke="#17A8BD" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <circle cx="26" cy="14" r="3" fill="none" stroke="#17A8BD" stroke-width="2"/>
+        <line x1="19" y1="19" x2="33" y2="19" stroke="#17A8BD" stroke-width="1.5" stroke-linecap="round"/>
+        <text x="58" y="23" font-family="Space Grotesk, sans-serif" font-size="20" font-weight="800" fill="white">BORDO</text>
+        <text x="58" y="38" font-family="Inter, sans-serif" font-size="10" font-weight="500" fill="rgba(255,255,255,0.4)" letter-spacing="3">NÁUTICO</text>
+      </svg>
+      <div class="logo-tile-label">Fundo escuro</div>
+    </div>
+
+    <!-- Claro -->
+    <div class="logo-tile light">
+      <svg width="160" height="52" viewBox="0 0 160 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="26" cy="26" r="24" fill="#17A8BD" opacity="0.10"/>
+        <circle cx="26" cy="26" r="24" stroke="#17A8BD" stroke-width="1.2" opacity="0.3"/>
+        <line x1="26" y1="11" x2="26" y2="41" stroke="#0A2540" stroke-width="2" stroke-linecap="round"/>
+        <line x1="17" y1="41" x2="35" y2="41" stroke="#0A2540" stroke-width="2" stroke-linecap="round"/>
+        <path d="M17 41 Q12 36 16 31" stroke="#0A2540" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M35 41 Q40 36 36 31" stroke="#0A2540" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <circle cx="26" cy="14" r="3" fill="none" stroke="#0A2540" stroke-width="2"/>
+        <line x1="19" y1="19" x2="33" y2="19" stroke="#0A2540" stroke-width="1.5" stroke-linecap="round"/>
+        <text x="58" y="23" font-family="Space Grotesk, sans-serif" font-size="20" font-weight="800" fill="#0A2540">BORDO</text>
+        <text x="58" y="38" font-family="Inter, sans-serif" font-size="10" font-weight="500" fill="#6B7B8D" letter-spacing="3">NÁUTICO</text>
+      </svg>
+      <div class="logo-tile-label">Fundo claro</div>
+    </div>
+
+    <!-- Aqua -->
+    <div class="logo-tile aqua-bg">
+      <svg width="160" height="52" viewBox="0 0 160 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="26" cy="26" r="24" fill="rgba(255,255,255,0.15)"/>
+        <circle cx="26" cy="26" r="24" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
+        <line x1="26" y1="11" x2="26" y2="41" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <line x1="17" y1="41" x2="35" y2="41" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <path d="M17 41 Q12 36 16 31" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M35 41 Q40 36 36 31" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <circle cx="26" cy="14" r="3" fill="none" stroke="white" stroke-width="2"/>
+        <line x1="19" y1="19" x2="33" y2="19" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <text x="58" y="23" font-family="Space Grotesk, sans-serif" font-size="20" font-weight="800" fill="white">BORDO</text>
+        <text x="58" y="38" font-family="Inter, sans-serif" font-size="10" font-weight="500" fill="rgba(255,255,255,0.7)" letter-spacing="3">NÁUTICO</text>
+      </svg>
+      <div class="logo-tile-label">Versão aqua</div>
+    </div>
+
+    <!-- Ícone solo -->
+    <div class="logo-tile light" style="justify-content:center">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="64" height="64" rx="16" fill="#0A2540"/>
+        <circle cx="32" cy="32" r="22" fill="#17A8BD" opacity="0.12"/>
+        <circle cx="32" cy="32" r="22" stroke="#17A8BD" stroke-width="1.5" opacity="0.5"/>
+        <line x1="32" y1="14" x2="32" y2="50" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="20" y1="50" x2="44" y2="50" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M20 50 Q13 42 18 35" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <path d="M44 50 Q51 42 46 35" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <circle cx="32" cy="17" r="4" fill="none" stroke="#17A8BD" stroke-width="2.5"/>
+        <line x1="23" y1="24" x2="41" y2="24" stroke="#17A8BD" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div class="logo-tile-label" style="color:var(--gray)">Ícone do app</div>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- PALETA -->
+<div class="section">
+  <div class="section-label">Sistema de cores</div>
+  <div class="section-title">Paleta de marca</div>
+
+  <div class="palette-row">
+    <div class="swatch">
+      <div class="swatch-color" style="background:#0A2540"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Oceano</div>
+        <div class="swatch-hex">#0A2540</div>
+        <div class="swatch-role">Cor primária · Headers · Textos</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#1B4F72"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Onda</div>
+        <div class="swatch-hex">#1B4F72</div>
+        <div class="swatch-role">Secundária · Navegação</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#17A8BD"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Aqua</div>
+        <div class="swatch-hex">#17A8BD</div>
+        <div class="swatch-role">Acento · CTAs · Destaques</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#5ECFDE"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Espuma</div>
+        <div class="swatch-hex">#5ECFDE</div>
+        <div class="swatch-role">Acento claro · Ícones</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#F7F3EC"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Areia</div>
+        <div class="swatch-hex">#F7F3EC</div>
+        <div class="swatch-role">Background · Superfícies</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="palette-row">
+    <div class="swatch">
+      <div class="swatch-color" style="background:#C0392B"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Alerta</div>
+        <div class="swatch-hex">#C0392B</div>
+        <div class="swatch-role">Urgência · Erros · Vencido</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#F39C12"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Atenção</div>
+        <div class="swatch-hex">#F39C12</div>
+        <div class="swatch-role">Avisos · Pendências</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#27ae60"></div>
+      <div class="swatch-info">
+        <div class="swatch-name">Confirmado</div>
+        <div class="swatch-hex">#27AE60</div>
+        <div class="swatch-role">Sucesso · Concluído · OK</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- TIPOGRAFIA -->
+<div class="section">
+  <div class="section-label">Tipografia</div>
+  <div class="section-title">Sistema de fontes</div>
+
+  <div class="type-row">
+    <div class="type-label">Display — Space Grotesk 800</div>
+    <div class="type-sample-display">Gestão que navega com você.</div>
+    <p style="font-size:12px;color:var(--gray);margin-top:6px">Usada em títulos, logo e elementos de destaque. Geométrica, técnica, moderna — lembra instrumentos de bordo.</p>
+  </div>
+
+  <div class="type-row">
+    <div class="type-label">Corpo — Inter 400/500</div>
+    <div class="type-sample-body">Diário de bordo, escala da tripulação, ordens de serviço e controle de estoque — tudo num único aplicativo feito para quem trabalha no mar.</div>
+  </div>
+
+  <div class="type-row">
+    <div class="type-label">Interface — Inter 700 · Caixa alta</div>
+    <div class="type-sample-ui">⚓ Bordo · Gestão Náutica</div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- VOZ -->
+<div class="section">
+  <div class="section-label">Tom de voz</div>
+  <div class="section-title">Como a marca fala</div>
+
+  <div class="voice-grid">
+    <div class="voice-card yes">
+      <div class="voice-header">✔ É assim</div>
+      <div class="voice-item">Direto e sem enrolação</div>
+      <div class="voice-item">Fala de igual pra igual com o trabalhador</div>
+      <div class="voice-item">Usa termos náuticos naturalmente</div>
+      <div class="voice-item">Confiante, como um bom capitão</div>
+      <div class="voice-item">"Sua OS foi registrada. Bora."</div>
+    </div>
+    <div class="voice-card no">
+      <div class="voice-header">✗ Não é assim</div>
+      <div class="voice-item">Corporativo ou engessado</div>
+      <div class="voice-item">Tecniquês desnecessário</div>
+      <div class="voice-item">Tom de startup gringa</div>
+      <div class="voice-item">Fala sobre o barco, não com o marinheiro</div>
+      <div class="voice-item">"Solução integrada de gestão marítima"</div>
+    </div>
+  </div>
+
+  <!-- Exemplos de copy -->
+  <div style="margin-top:20px;background:var(--white);border-radius:14px;padding:20px 24px;border:1px solid var(--lg)">
+    <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--aqua);margin-bottom:14px">Exemplos de copy</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:14px;color:var(--ocean)">🔔 <strong>Notificação:</strong> "Habilitação do João vence em 15 dias. Hora de renovar."</div>
+      <div style="font-size:14px;color:var(--ocean)">✅ <strong>Check-list:</strong> "Tudo certo. Pode zarpar."</div>
+      <div style="font-size:14px;color:var(--ocean)">📦 <strong>Estoque:</strong> "Óleo abaixo do mínimo. Reabastecer antes da próxima saída."</div>
+      <div style="font-size:14px;color:var(--ocean)">🔧 <strong>OS concluída:</strong> "Serviço finalizado. Assine e envie pro cliente."</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- SLOGAN FINAL -->
+<div style="background:var(--ocean);padding:64px 32px;text-align:center">
+  <div style="font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--aqua);margin-bottom:16px">Slogan</div>
+  <div style="font-family:'Space Grotesk',sans-serif;font-size:clamp(24px,5vw,42px);font-weight:800;color:white;line-height:1.2;margin-bottom:12px">
+    Do cais ao convés.<br>Tudo a bordo.
+  </div>
+  <div style="font-size:15px;color:rgba(255,255,255,0.4);max-width:400px;margin:0 auto;line-height:1.6">
+    O app que o trabalhador náutico sempre precisou — e que o mercado brasileiro ainda não tinha.
+  </div>
+
+  <div style="margin-top:40px;display:inline-flex;align-items:center;gap:12px;background:rgba(23,168,189,0.12);border:1px solid rgba(23,168,189,0.3);border-radius:40px;padding:12px 24px">
+    <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+      <circle cx="32" cy="32" r="22" stroke="#17A8BD" stroke-width="1.5" opacity="0.5"/>
+      <line x1="32" y1="14" x2="32" y2="50" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="20" y1="50" x2="44" y2="50" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M20 50 Q13 42 18 35" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <path d="M44 50 Q51 42 46 35" stroke="#17A8BD" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <circle cx="32" cy="17" r="4" fill="none" stroke="#17A8BD" stroke-width="2.5"/>
+      <line x1="23" y1="24" x2="41" y2="24" stroke="#17A8BD" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <span style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:800;color:white">BORDO<span style="color:#17A8BD">.</span></span>
+    <span style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:2px;font-weight:600">GESTÃO NÁUTICA</span>
+  </div>
+</div>
+
+</body>
+</html>

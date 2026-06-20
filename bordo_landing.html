@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BORDO. — Gestão Náutica para quem trabalha no mar</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0A2540">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ocean:  #0A2540;
+  --wave:   #1B4F72;
+  --aqua:   #17A8BD;
+  --aqualt: #5ECFDE;
+  --foam:   #E4F4F8;
+  --sand:   #F7F3EC;
+  --rust:   #C0392B;
+  --gold:   #F39C12;
+  --green:  #27AE60;
+  --white:  #FFFFFF;
+  --gray:   #6B7B8D;
+  --lg:     #D5DDE5;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--ocean);
+  color: var(--white);
+  overflow-x: hidden;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 48px;
+  background: rgba(10,37,64,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.nav-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--white);
+  text-decoration: none;
+  letter-spacing: -0.5px;
+}
+.nav-logo span { color: var(--aqua); }
+.nav-links {
+  display: flex;
+  gap: 32px;
+  list-style: none;
+}
+.nav-links a {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.55);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--white); }
+.nav-cta {
+  background: var(--aqua);
+  color: var(--white) !important;
+  padding: 9px 22px;
+  border-radius: 10px;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+}
+.nav-cta:hover { background: var(--aqualt) !important; color: var(--ocean) !important; }
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 120px 24px 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated ocean waves background */
+.hero-waves {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 220px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wave-path {
+  position: absolute;
+  bottom: 0;
+  width: 200%;
+  animation: waveMove 8s linear infinite;
+}
+.wave-path:nth-child(2) { animation-duration: 12s; animation-direction: reverse; opacity: 0.4; bottom: 10px; }
+.wave-path:nth-child(3) { animation-duration: 16s; opacity: 0.2; bottom: 20px; }
+@keyframes waveMove {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.hero-glow {
+  position: absolute;
+  top: -10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(23,168,189,0.13) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.hero-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--aqua);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.eyebrow-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--aqua);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+
+.hero h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(40px, 8vw, 80px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -2px;
+  margin-bottom: 24px;
+  max-width: 800px;
+}
+.hero h1 em {
+  font-style: normal;
+  color: var(--aqua);
+  position: relative;
+}
+
+.hero-sub {
+  font-size: clamp(16px, 2.5vw, 20px);
+  color: rgba(255,255,255,0.5);
+  line-height: 1.6;
+  max-width: 520px;
+  margin: 0 auto 48px;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 72px;
+}
+.btn-primary {
+  background: var(--aqua);
+  color: var(--white);
+  border: none;
+  border-radius: 14px;
+  padding: 16px 36px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: background 0.2s, transform 0.15s;
+}
+.btn-primary:hover { background: var(--aqualt); color: var(--ocean); transform: translateY(-2px); }
+.btn-ghost {
+  background: transparent;
+  color: rgba(255,255,255,0.65);
+  border: 1.5px solid rgba(255,255,255,0.2);
+  border-radius: 14px;
+  padding: 16px 36px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-ghost:hover { border-color: var(--aqua); color: var(--white); }
+
+/* Stat bar */
+.hero-stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
+}
+.stat-item { text-align: center; }
+.stat-number {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--white);
+  line-height: 1;
+}
+.stat-number span { color: var(--aqua); }
+.stat-label { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px; font-weight: 500; }
+
+/* ── SECTION COMUM ── */
+.sec {
+  padding: 96px 24px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.sec-light {
+  background: var(--sand);
+  color: var(--ocean);
+  padding: 96px 24px;
+}
+.sec-light .sec { padding: 0; }
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--aqua);
+  margin-bottom: 12px;
+}
+.sec h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin-bottom: 16px;
+}
+.sec-light h2 { color: var(--ocean); }
+.sec p.lead {
+  font-size: 18px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.55);
+  max-width: 540px;
+}
+.sec-light p.lead { color: var(--gray); }
+
+/* ── PERFIS ── */
+.profiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 56px;
+}
+.profile-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 28px 24px;
+  transition: border-color 0.25s, transform 0.2s;
+  cursor: default;
+}
+.profile-card:hover {
+  border-color: var(--aqua);
+  transform: translateY(-4px);
+}
+.profile-emoji {
+  font-size: 36px;
+  margin-bottom: 16px;
+  display: block;
+}
+.profile-card h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.profile-card p {
+  font-size: 14px;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.profile-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.profile-features li {
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.profile-features li::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--aqua);
+  flex-shrink: 0;
+}
+
+/* ── FUNCIONALIDADES ── */
+.features-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 56px;
+}
+.feature-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: center;
+}
+.feature-row.reverse { direction: rtl; }
+.feature-row.reverse > * { direction: ltr; }
+
+.feature-text { padding: 8px 0; }
+.feature-text h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ocean);
+  margin-bottom: 10px;
+}
+.feature-text p {
+  font-size: 15px;
+  color: var(--gray);
+  line-height: 1.65;
+  margin-bottom: 16px;
+}
+.feature-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  background: var(--foam);
+  color: var(--wave);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.feature-mockup {
+  background: var(--ocean);
+  border-radius: 20px;
+  padding: 20px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.feature-mockup::before {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(23,168,189,0.15), transparent 70%);
+}
+.mock-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--aqua);
+  margin-bottom: 4px;
+}
+.mock-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 12px;
+}
+.mock-row {
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mock-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.mock-label { font-size: 13px; color: rgba(255,255,255,0.75); flex: 1; }
+.mock-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+.mock-bar-wrap { background: rgba(255,255,255,0.1); border-radius: 4px; height: 5px; flex: 1; }
+.mock-bar { height: 100%; border-radius: 4px; }
+
+/* ── DEPOIMENTOS ── */
+.testimonials {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  margin-top: 56px;
+}
+.testi-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 24px;
+}
+.testi-quote {
+  font-size: 15px;
+  line-height: 1.65;
+  color: rgba(255,255,255,0.75);
+  margin-bottom: 20px;
+  font-style: italic;
+}
+.testi-author { display: flex; align-items: center; gap: 12px; }
+.testi-avatar {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.testi-name { font-weight: 700; font-size: 14px; color: var(--white); }
+.testi-role { font-size: 12px; color: rgba(255,255,255,0.4); }
+
+/* ── PREÇOS ── */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-top: 56px;
+  align-items: start;
+}
+.price-card {
+  border-radius: 20px;
+  padding: 28px 24px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+  position: relative;
+}
+.price-card.featured {
+  background: var(--aqua);
+  border-color: var(--aqua);
+  transform: scale(1.03);
+}
+.price-card.featured * { color: var(--white) !important; }
+.price-badge {
+  position: absolute;
+  top: -1px; left: 50%; transform: translateX(-50%);
+  background: var(--ocean);
+  color: var(--aqua) !important;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 4px 14px;
+  border-radius: 0 0 10px 10px;
+}
+.price-plan {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 12px;
+}
+.price-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 42px;
+  font-weight: 800;
+  color: var(--white);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.price-value sup { font-size: 18px; vertical-align: top; margin-top: 8px; display: inline-block; }
+.price-period { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 20px; }
+.price-desc { font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 20px; line-height: 1.5; }
+.price-items { list-style: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: 24px; }
+.price-items li { font-size: 13px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 8px; }
+.price-items li::before { content: '✓'; color: var(--aqua); font-weight: 800; }
+.price-card.featured .price-items li::before { color: var(--white); }
+.btn-price {
+  width: 100%;
+  padding: 13px 0;
+  border-radius: 12px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s;
+}
+.btn-price:hover { opacity: 0.85; }
+.btn-price-outline {
+  background: transparent;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  color: var(--white);
+}
+.btn-price-solid {
+  background: var(--ocean);
+  color: var(--white);
+}
+.btn-price-aqua {
+  background: var(--ocean);
+  color: var(--aqua);
+}
+
+/* ── CTA FINAL ── */
+.cta-section {
+  padding: 100px 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cta-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(23,168,189,0.12) 0%, transparent 60%);
+  pointer-events: none;
+}
+.cta-section h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(32px, 6vw, 60px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  margin-bottom: 16px;
+}
+.cta-section h2 span { color: var(--aqua); }
+.cta-section p {
+  font-size: 18px;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 40px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.5;
+}
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding: 48px 48px 32px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.footer-brand p {
+  font-size: 13px;
+  color: rgba(255,255,255,0.3);
+  margin-top: 8px;
+  max-width: 220px;
+  line-height: 1.5;
+}
+.footer-links { display: flex; flex-direction: column; gap: 8px; }
+.footer-links a { font-size: 13px; color: rgba(255,255,255,0.35); text-decoration: none; transition: color 0.2s; }
+.footer-links a:hover { color: var(--aqua); }
+.footer-copy {
+  width: 100%;
+  font-size: 12px;
+  color: rgba(255,255,255,0.2);
+  border-top: 1px solid rgba(255,255,255,0.05);
+  padding-top: 24px;
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  nav { padding: 16px 20px; }
+  .nav-links { display: none; }
+  .feature-row { grid-template-columns: 1fr; }
+  .feature-row.reverse { direction: ltr; }
+  footer { padding: 40px 20px 24px; flex-direction: column; }
+  .hero-stats { gap: 28px; }
+  .price-card.featured { transform: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">BORDO<span>.</span></a>
+  <ul class="nav-links">
+    <li><a href="#perfis">Para quem</a></li>
+    <li><a href="#funcionalidades">Funcionalidades</a></li>
+    <li><a href="#precos">Planos</a></li>
+    <li><a href="#cta" class="nav-cta">Começar grátis</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+
+  <div class="hero-eyebrow">
+    <span class="eyebrow-dot"></span>
+    Gestão Náutica Brasileira
+  </div>
+
+  <h1>
+    O app que o<br>
+    <em>trabalhador náutico</em><br>
+    sempre precisou.
+  </h1>
+
+  <p class="hero-sub">
+    Diário de bordo, ordens de serviço, escala de tripulação e controle de estoque — tudo num único lugar. Feito pra quem trabalha no mar, não pra quem assiste da marina.
+  </p>
+
+  <div class="hero-actions">
+    <a href="#cta" class="btn-primary">Começar grátis →</a>
+    <a href="#funcionalidades" class="btn-ghost">Ver como funciona</a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat-item">
+      <div class="stat-number">3<span>+</span></div>
+      <div class="stat-label">Perfis de usuário</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number" style="color:var(--aqua)">100<span>%</span></div>
+      <div class="stat-label">Focado no trabalhador</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-number">0</div>
+      <div class="stat-label">Equivalentes no Brasil</div>
+    </div>
+  </div>
+
+  <!-- Ondas animadas -->
+  <div class="hero-waves">
+    <svg class="wave-path" viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 40 Q180 0 360 40 Q540 80 720 40 Q900 0 1080 40 Q1260 80 1440 40 L1440 80 L0 80Z" fill="rgba(23,168,189,0.07)"/>
+    </svg>
+    <svg class="wave-path" viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 50 Q180 10 360 50 Q540 90 720 50 Q900 10 1080 50 Q1260 90 1440 50 L1440 80 L0 80Z" fill="rgba(23,168,189,0.05)"/>
+    </svg>
+    <svg class="wave-path" viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 30 Q180 70 360 30 Q540 -10 720 30 Q900 70 1080 30 Q1260 -10 1440 30 L1440 80 L0 80Z" fill="rgba(94,207,222,0.04)"/>
+    </svg>
+  </div>
+</section>
+
+<!-- PERFIS -->
+<section id="perfis" style="padding: 96px 24px; max-width:1080px; margin:0 auto;">
+  <div class="eyebrow">Para quem é o BORDO.</div>
+  <h2>Cada trabalhador<br>tem o seu app.</h2>
+  <p class="lead">Três perfis, três experiências. Cada um vê só o que precisa, sem poluição visual.</p>
+
+  <div class="profiles-grid">
+    <div class="profile-card">
+      <span class="profile-emoji">🧑‍✈️</span>
+      <h3>Marinheiro & Tripulante</h3>
+      <p>Para capitães, marinheiros de máquinas, contramestres e qualquer membro de tripulação.</p>
+      <ul class="profile-features">
+        <li>Diário de bordo digital com assinatura</li>
+        <li>Check-list de segurança antes de zarpar</li>
+        <li>Controle de documentos da tripulação</li>
+        <li>Escala e alertas de vencimento</li>
+        <li>Gestão de estoque de bordo</li>
+      </ul>
+    </div>
+
+    <div class="profile-card" style="border-color: rgba(142,68,173,0.3);">
+      <span class="profile-emoji">🧹</span>
+      <h3>Equipe de Marinharia</h3>
+      <p>Para profissionais de limpeza, polimento, conservação e cuidado de embarcações.</p>
+      <ul class="profile-features">
+        <li>Ordens de serviço com check-list</li>
+        <li>Registro de fotos antes/depois</li>
+        <li>Relatório automático para o cliente</li>
+        <li>Controle de serviços concluídos</li>
+        <li>Assinatura digital do cliente</li>
+      </ul>
+    </div>
+
+    <div class="profile-card" style="border-color: rgba(243,156,18,0.3);">
+      <span class="profile-emoji">🔧</span>
+      <h3>Técnico de Manutenção</h3>
+      <p>Para mecânicos navais, eletricistas de bordo e especialistas em manutenção náutica.</p>
+      <ul class="profile-features">
+        <li>Ordens de serviço com peças usadas</li>
+        <li>Controle de horas trabalhadas</li>
+        <li>Histórico por embarcação</li>
+        <li>Alertas de peças em falta</li>
+        <li>Relatório técnico exportável</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- FUNCIONALIDADES -->
+<div class="sec-light" id="funcionalidades">
+  <div class="sec">
+    <div class="eyebrow" style="color:var(--aqua)">Funcionalidades</div>
+    <h2>Tudo que acontece<br>a bordo, registrado.</h2>
+    <p class="lead">Do diário de bordo às ordens de serviço — cada detalhe documentado, acessível e seguro.</p>
+
+    <div class="features-list">
+
+      <!-- Feature 1 -->
+      <div class="feature-row">
+        <div class="feature-text">
+          <h3>📋 Diário de Bordo Digital</h3>
+          <p>Registre saídas, chegadas, ocorrências e manutenções em tempo real. Com assinatura digital do responsável e histórico completo sempre disponível.</p>
+          <div class="feature-chips">
+            <span class="chip">Assinatura digital</span>
+            <span class="chip">Exporta PDF</span>
+            <span class="chip">Funciona offline</span>
+          </div>
+        </div>
+        <div class="feature-mockup">
+          <div class="mock-header">⚓ BORDO.</div>
+          <div class="mock-title">Diário de Bordo</div>
+          <div class="mock-row">
+            <div class="mock-dot" style="background:var(--aqua)"></div>
+            <span class="mock-label">Saída — Porto de Santos</span>
+            <span class="mock-badge" style="background:rgba(23,168,189,0.2);color:var(--aqua)">08:00</span>
+          </div>
+          <div class="mock-row">
+            <div class="mock-dot" style="background:var(--rust)"></div>
+            <span class="mock-label">Ocorrência — Gerador</span>
+            <span class="mock-badge" style="background:rgba(192,57,43,0.2);color:var(--rust)">14:30</span>
+          </div>
+          <div class="mock-row">
+            <div class="mock-dot" style="background:var(--gold)"></div>
+            <span class="mock-label">Manutenção — Óleo motor</span>
+            <span class="mock-badge" style="background:rgba(243,156,18,0.2);color:var(--gold)">⏳</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="feature-row reverse">
+        <div class="feature-text">
+          <h3>🔧 Ordens de Serviço</h3>
+          <p>Crie, acompanhe e finalize ordens de serviço com check-list de tarefas, registro de fotos e relatório automático para o cliente — tudo no celular.</p>
+          <div class="feature-chips">
+            <span class="chip">Check-list de tarefas</span>
+            <span class="chip">Fotos antes/depois</span>
+            <span class="chip">Relatório automático</span>
+          </div>
+        </div>
+        <div class="feature-mockup">
+          <div class="mock-header">🔧 ORDENS DE SERVIÇO</div>
+          <div class="mock-title">OS-2026-041 · Lancha Brisa Mar</div>
+          <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px;margin-bottom:6px">
+            <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:6px">Progresso das tarefas</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="mock-bar-wrap"><div class="mock-bar" style="width:50%;background:var(--gold)"></div></div>
+              <span style="font-size:12px;color:var(--gold);font-weight:700">50%</span>
+            </div>
+          </div>
+          <div class="mock-row">
+            <div class="mock-dot" style="background:var(--green)"></div>
+            <span class="mock-label">Lavar casco</span>
+            <span style="font-size:11px;color:var(--green);font-weight:700">✓</span>
+          </div>
+          <div class="mock-row">
+            <div class="mock-dot" style="background:rgba(255,255,255,0.2)"></div>
+            <span class="mock-label">Limpar cabine interna</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.3)">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-row">
+        <div class="feature-text">
+          <h3>👥 Tripulação & Documentos</h3>
+          <p>Controle os documentos de cada tripulante — habilitação náutica, certificados e muito mais. Alertas automáticos quando algo está prestes a vencer.</p>
+          <div class="feature-chips">
+            <span class="chip">Alertas de vencimento</span>
+            <span class="chip">Histórico por membro</span>
+            <span class="chip">Exporta relatório</span>
+          </div>
+        </div>
+        <div class="feature-mockup">
+          <div class="mock-header">👥 TRIPULAÇÃO</div>
+          <div class="mock-title">MV Esperança · 4 membros</div>
+          <div class="mock-row">
+            <div class="mock-dot" style="background:var(--green)"></div>
+            <span class="mock-label">Carlos Mendes — Capitão</span>
+            <span class="mock-badge" style="background:rgba(39,174,96,0.2);color:var(--green)">OK</span>
+          </div>
+          <div class="mock-row">
+            <div class="mock-dot" style="background:var(--rust)"></div>
+            <span class="mock-label">João Ferreira — Contramestre</span>
+            <span class="mock-badge" style="background:rgba(192,57,43,0.2);color:var(--rust)">Vencido</span>
+          </div>
+          <div class="mock-row">
+            <div class="mock-dot" style="background:var(--gold)"></div>
+            <span class="mock-label">Ana Costa — Cozinheira</span>
+            <span class="mock-badge" style="background:rgba(243,156,18,0.2);color:var(--gold)">12 dias</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- DEPOIMENTOS -->
+<section style="padding: 96px 24px; max-width:1080px; margin:0 auto;">
+  <div class="eyebrow">Quem usa, aprova</div>
+  <h2>A voz de quem<br>está no mar todo dia.</h2>
+
+  <div class="testimonials">
+    <div class="testi-card">
+      <p class="testi-quote">"Antes eu anotava tudo num caderno que molhava, sumia, rasgava. Agora tá tudo no celular e consigo gerar o relatório na hora."</p>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:rgba(23,168,189,0.15)">🧑‍✈️</div>
+        <div>
+          <div class="testi-name">Marcos Oliveira</div>
+          <div class="testi-role">Capitão de Cabotagem · Santos, SP</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="testi-card">
+      <p class="testi-quote">"A OS com foto antes e depois mudou tudo. O cliente vê o serviço, confia mais, paga na hora. Simples assim."</p>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:rgba(142,68,173,0.15)">🧹</div>
+        <div>
+          <div class="testi-name">Fernanda Rocha</div>
+          <div class="testi-role">Equipe de Marinharia · Angra dos Reis, RJ</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="testi-card">
+      <p class="testi-quote">"O alerta de peças em falta me salvou numa viagem. Sem o BORDO. eu não teria percebido antes de zarpar."</p>
+      <div class="testi-author">
+        <div class="testi-avatar" style="background:rgba(243,156,18,0.15)">🔧</div>
+        <div>
+          <div class="testi-name">Ricardo Nunes</div>
+          <div class="testi-role">Mecânico Naval · Florianópolis, SC</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PREÇOS -->
+<section id="precos" style="padding: 96px 24px; max-width:1080px; margin:0 auto;">
+  <div class="eyebrow">Planos</div>
+  <h2>Simples de entender,<br>justo de pagar.</h2>
+  <p class="lead">Sem taxa de adesão. Cancele quando quiser. Começa grátis.</p>
+
+  <div class="pricing-grid">
+
+    <div class="price-card">
+      <div class="price-plan">Grátis</div>
+      <div class="price-value">R$<sup></sup>0</div>
+      <div class="price-period">para sempre</div>
+      <div class="price-desc">Para quem quer experimentar antes de decidir.</div>
+      <ul class="price-items">
+        <li>1 perfil de usuário</li>
+        <li>Diário de bordo (30 registros)</li>
+        <li>Check-list de segurança</li>
+        <li>3 Ordens de Serviço/mês</li>
+      </ul>
+      <button class="btn-price btn-price-outline">Começar grátis</button>
+    </div>
+
+    <div class="price-card featured">
+      <div class="price-badge">Mais popular</div>
+      <div class="price-plan">Profissional</div>
+      <div class="price-value"><sup>R$</sup>49</div>
+      <div class="price-period">por usuário / mês</div>
+      <div class="price-desc">Para profissionais que trabalham no mar todo dia.</div>
+      <ul class="price-items">
+        <li>Tudo do plano Grátis</li>
+        <li>Diário de bordo ilimitado</li>
+        <li>Ordens de serviço ilimitadas</li>
+        <li>Fotos e relatório em PDF</li>
+        <li>Controle de tripulação completo</li>
+        <li>Funciona offline</li>
+      </ul>
+      <button class="btn-price btn-price-solid">Assinar agora</button>
+    </div>
+
+    <div class="price-card">
+      <div class="price-plan">Marina / Empresa</div>
+      <div class="price-value"><sup>R$</sup>199</div>
+      <div class="price-period">até 10 usuários / mês</div>
+      <div class="price-desc">Para marinas, estaleiros e equipes maiores.</div>
+      <ul class="price-items">
+        <li>Tudo do Profissional</li>
+        <li>Até 10 usuários</li>
+        <li>Painel de gestão da marina</li>
+        <li>Relatórios consolidados</li>
+        <li>Suporte prioritário</li>
+        <li>Onboarding com a equipe</li>
+      </ul>
+      <button class="btn-price btn-price-outline">Falar com vendas</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="cta-section" id="cta">
+  <h2>Do cais ao convés.<br><span>Tudo a bordo.</span></h2>
+  <p>Comece grátis hoje. Sem cartão de crédito, sem burocracia.</p>
+  <a href="#" class="btn-primary" style="font-size:18px;padding:18px 48px;">Criar conta gratuita →</a>
+  <div style="margin-top:20px;font-size:13px;color:rgba(255,255,255,0.25)">Disponível para Android e iOS · Funciona offline</div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:800;color:var(--white)">
+      BORDO<span style="color:var(--aqua)">.</span>
+    </div>
+    <p>Gestão náutica feita para quem trabalha no mar, não para quem assiste da marina.</p>
+  </div>
+
+  <div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.25);margin-bottom:12px">Produto</div>
+    <div class="footer-links">
+      <a href="#">Funcionalidades</a>
+      <a href="#">Planos e preços</a>
+      <a href="#">Para marinas</a>
+      <a href="#">Baixar o app</a>
+    </div>
+  </div>
+
+  <div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.25);margin-bottom:12px">Empresa</div>
+    <div class="footer-links">
+      <a href="#">Sobre nós</a>
+      <a href="#">Blog</a>
+      <a href="#">Contato</a>
+      <a href="#">Suporte</a>
+    </div>
+  </div>
+
+  <div class="footer-copy">
+    <span>© 2026 BORDO. Todos os direitos reservados.</span>
+    <span>Privacidade · Termos de uso</span>
+  </div>
+</footer>
+
+</body>
+</html>

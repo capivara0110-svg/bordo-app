@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProfileType {
+  MARINHEIRO
+  MARINHARIA
+  TECNICO
+  GESTOR
+}
+
+model User {
+  id          String         @id @default(cuid())
+  email       String         @unique
+  alias       String?
+  plan        String         @default("BRONZE")
+  status      String         @default("ATIVO")
+  profileType ProfileType    @default(MARINHEIRO)
+  password    String?
+  vessel      Vessel?        @relation(fields: [vesselId], references: [id])
+  vesselId    String?
+  onboarding  Onboarding?
+  gestorState GestorState?
+  notifications Notification[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model Vessel {
+  id           String  @id @default(cuid())
+  name         String
+  type         String
+  registration String
+  location     String?
+  users        User[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Onboarding {
+  id                String   @id @default(cuid())
+  user              User     @relation(fields: [userId], references: [id])
+  userId            String   @unique
+  step              Int      @default(0)
+  empresa           String?
+  perfil            String?
+  embarcacaoNome    String?
+  embarcacaoTipo    String?
+  embarcacaoRegistro String?
+  alertas           String[] @default([])
+  skipEmb           Boolean  @default(false)
+  completed         Boolean  @default(false)
+  updatedAt         DateTime @updatedAt
+}
+
+model GestorState {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  activeTab String   @default("dashboard")
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  title      String
+  message    String
+  category   String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
