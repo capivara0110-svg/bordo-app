@@ -9,13 +9,23 @@ const ASSETS = [
   "/icon.svg",
 ];
 
+const isMobileDevice = () =>
+  typeof self.navigator !== "undefined" &&
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(self.navigator.userAgent || "");
+
 self.addEventListener("install", (event) => {
+  if (!isMobileDevice()) {
+    return;
+  }
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (event) => {
+  if (!isMobileDevice()) {
+    return;
+  }
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
@@ -26,7 +36,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") {
+  if (!isMobileDevice() || event.request.method !== "GET") {
     return;
   }
 

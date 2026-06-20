@@ -562,6 +562,10 @@ export default function BordoApp() {
     saveAppState(appState);
   }, [appState]);
 
+  const isMobileDevice = () =>
+    typeof navigator !== "undefined" &&
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
   useEffect(() => {
     if (!document.getElementById("tailwindcss-cdn")) {
       const configScript = document.createElement("script");
@@ -574,7 +578,12 @@ export default function BordoApp() {
       document.head.appendChild(script);
     }
 
-    if (typeof window !== "undefined" && "serviceWorker" in navigator && (window.location.protocol === "https:" || window.location.hostname === "localhost")) {
+    if (
+      typeof window !== "undefined" &&
+      isMobileDevice() &&
+      "serviceWorker" in navigator &&
+      (window.location.protocol === "https:" || window.location.hostname === "localhost")
+    ) {
       navigator.serviceWorker.register("/sw.js").then((registration) => {
         console.log("Service worker registered:", registration.scope);
       }).catch((error) => {
