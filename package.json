@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "dev:frontend": "vite",
+    "dev:frontend": "vite --host 0.0.0.0",
     "build:frontend": "vite build",
+    "preview": "vite preview",
     "build": "prisma generate && vite build",
     "prisma": "prisma"
   },
@@ -19,9 +20,10 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
     "nodemon": "^2.0.22",
     "prisma": "^5.10.0",
-    "vite": "^5.0.0",
-    "@vitejs/plugin-react": "^4.0.0"
+    "react-refresh": "^0.18.0",
+    "vite": "^5.0.0"
   }
 }
