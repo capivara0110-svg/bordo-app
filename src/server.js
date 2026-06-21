@@ -1,4 +1,5 @@
 import "dotenv/config";
+import path from "path";
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 
@@ -20,6 +21,10 @@ app.use((req, res, next) => {
   }
   return next();
 });
+
+const distPath = path.resolve(process.cwd(), "dist");
+app.use(express.static(distPath));
+app.get("/", (req, res) => res.sendFile(path.resolve(distPath, "index.html")));
 
 app.get("/api/users", async (req, res) => {
   try {
@@ -298,6 +303,10 @@ app.put("/api/gestor/:id", async (req, res) => {
     console.error("Failed to update gestor state", error);
     return res.status(500).json({ error: "Não foi possível atualizar o estado do gestor." });
   }
+});
+
+app.get("/*", (req, res) => {
+  res.sendFile(path.resolve(distPath, "index.html"));
 });
 
 app.listen(PORT, () => {
