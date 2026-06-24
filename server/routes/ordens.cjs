@@ -11,6 +11,7 @@ const canManage = requireAccess({
 });
 const allowedStatus = ["aguardando", "em_andamento", "concluida", "cancelada"];
 const allowedPriorities = ["baixa", "media", "normal", "alta", "urgente"];
+const allowedPhotoCategories = ["geral", "antes", "durante", "depois", "documento"];
 
 async function getOrder(id, empresaId) {
   const order = await db.prepare(
@@ -22,6 +23,14 @@ async function getOrder(id, empresaId) {
     "SELECT * FROM os_tarefas WHERE os_id = ? ORDER BY id",
   ).all(order.id);
   return { ...order, itens: tarefas };
+}
+
+async function getOrderPhotos(id, empresaId) {
+  return db.prepare(
+    `SELECT * FROM fotos
+     WHERE tipo = 'ordem' AND referencia_id = ? AND empresa_id = ?
+     ORDER BY criado_em DESC, id DESC`,
+  ).all(id, empresaId);
 }
 
 function cleanTaskList(value) {
@@ -36,6 +45,21 @@ function cleanTaskList(value) {
 
 function clean(value) {
   return String(value || "").trim();
+}
+
+function cleanPhotoPayload(body) {
+  const url = clean(body.url);
+  if (!url) return { erro: "Foto obrigatoria" };
+  if (!url.startsWith("data:image/") && !/^https?:\/\//i.test(url)) {
+    return { erro: "Formato de foto invalido" };
+  }
+  if (url.length > 750000) return { erro: "Foto muito grande" };
+  const categoria = allowedPhotoCategories.includes(body.categoria) ? body.categoria : "geral";
+  return {
+    url,
+    categoria,
+    legenda: clean(body.legenda).slice(0, 180),
+  };
 }
 
 async function resolveCliente(value, empresaId) {
@@ -202,6 +226,37 @@ router.post("/:id/tarefas", auth, canManage, requirePlanoAtivo, async (req, res)
   await db.prepare("INSERT INTO os_tarefas (os_id,tarefa,done) VALUES (?,?,?)")
     .run(req.params.id, tarefa, 0);
   return res.status(201).json(await getOrder(req.params.id, req.usuario.empresa_id));
+});
+
+router.get("/:id/fotos", auth, async (req, res) => {
+  const order = await getOrder(req.params.id, req.usuario.empresa_id);
+  if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
+  return res.json(await getOrderPhotos(req.params.id, req.usuario.empresa_id));
+});
+
+router.post("/:id/fotos", auth, canManage, requirePlanoAtivo, async (req, res) => {
+  const order = await getOrder(req.params.id, req.usuario.empresa_id);
+  if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
+
+  const foto = cleanPhotoPayload(req.body);
+  if (foto.erro) return res.status(400).json({ erro: foto.erro });
+
+  const result = await db.prepare(
+    `INSERT INTO fotos (empresa_id,tipo,referencia_id,url,legenda,categoria)
+     VALUES (?,?,?,?,?,?)`,
+  ).run(req.usuario.empresa_id, "ordem", req.params.id, foto.url, foto.legenda, foto.categoria);
+
+  await db.prepare(
+    "UPDATE ordens_servico SET fotos = fotos + 1 WHERE id = ? AND empresa_id = ?",
+  ).run(req.params.id, req.usuario.empresa_id);
+
+  return res.status(201).json({
+    id: result.lastInsertRowid,
+    empresa_id: req.usuario.empresa_id,
+    tipo: "ordem",
+    referencia_id: Number(req.params.id),
+    ...foto,
+  });
 });
 
 router.put("/:id/tarefa/:tarefaId", auth, canManage, requirePlanoAtivo, async (req, res) => {

@@ -8,9 +8,25 @@ const canManage = requireAccess({
   roles: ["proprietario", "gestor", "tecnico"],
   profiles: ["gestor", "tecnico", "marinharia"],
 });
+const allowedPhotoCategories = ["geral", "antes", "durante", "depois", "documento"];
 
 function clean(value) {
   return String(value || "").trim();
+}
+
+function cleanPhotoPayload(body) {
+  const url = clean(body.url);
+  if (!url) return { erro: "Foto obrigatoria" };
+  if (!url.startsWith("data:image/") && !/^https?:\/\//i.test(url)) {
+    return { erro: "Formato de foto invalido" };
+  }
+  if (url.length > 750000) return { erro: "Foto muito grande" };
+  const categoria = allowedPhotoCategories.includes(body.categoria) ? body.categoria : "geral";
+  return {
+    url,
+    categoria,
+    legenda: clean(body.legenda).slice(0, 180),
+  };
 }
 
 async function getEmbarcacao(id, empresaId) {
@@ -53,6 +69,39 @@ router.get("/:id/historico", auth, async (req, res) => {
   ).all(req.params.id, req.usuario.empresa_id);
 
   return res.json({ embarcacao, ordens });
+});
+
+router.get("/:id/fotos", auth, async (req, res) => {
+  const embarcacao = await getEmbarcacao(req.params.id, req.usuario.empresa_id);
+  if (!embarcacao) return res.status(404).json({ erro: "Embarcacao nao encontrada" });
+
+  const fotos = await db.prepare(
+    `SELECT * FROM fotos
+     WHERE tipo = 'embarcacao' AND referencia_id = ? AND empresa_id = ?
+     ORDER BY criado_em DESC, id DESC`,
+  ).all(req.params.id, req.usuario.empresa_id);
+  return res.json(fotos);
+});
+
+router.post("/:id/fotos", auth, canManage, async (req, res) => {
+  const embarcacao = await getEmbarcacao(req.params.id, req.usuario.empresa_id);
+  if (!embarcacao) return res.status(404).json({ erro: "Embarcacao nao encontrada" });
+
+  const foto = cleanPhotoPayload(req.body);
+  if (foto.erro) return res.status(400).json({ erro: foto.erro });
+
+  const result = await db.prepare(
+    `INSERT INTO fotos (empresa_id,tipo,referencia_id,url,legenda,categoria)
+     VALUES (?,?,?,?,?,?)`,
+  ).run(req.usuario.empresa_id, "embarcacao", req.params.id, foto.url, foto.legenda, foto.categoria);
+
+  return res.status(201).json({
+    id: result.lastInsertRowid,
+    empresa_id: req.usuario.empresa_id,
+    tipo: "embarcacao",
+    referencia_id: Number(req.params.id),
+    ...foto,
+  });
 });
 
 router.post("/", auth, canManage, async (req, res) => {

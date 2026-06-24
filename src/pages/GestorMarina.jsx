@@ -54,6 +54,14 @@ const priorityOptions = [
   ["urgente", "Urgente"],
 ];
 
+const photoCategories = [
+  ["geral", "Geral"],
+  ["antes", "Antes"],
+  ["durante", "Durante"],
+  ["depois", "Depois"],
+  ["documento", "Documento"],
+];
+
 function dateKey(value) {
   return String(value || "").slice(0, 10);
 }
@@ -92,6 +100,10 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [clientHistory, setClientHistory] = useState(null);
   const [boatHistory, setBoatHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState("");
+  const [photoPanel, setPhotoPanel] = useState(null);
+  const [photoForm, setPhotoForm] = useState({ url: "", legenda: "", categoria: "geral" });
+  const [photoMessage, setPhotoMessage] = useState("");
+  const [photoSaving, setPhotoSaving] = useState(false);
 
   const tabs = [
     { id: "dashboard", icon: "📊", label: "Painel" },
@@ -141,6 +153,73 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
 
   const refreshAgenda = async () => {
     setAgenda(await api.agenda.listar());
+  };
+
+  const openPhotoPanel = async (tipo, item) => {
+    setPhotoMessage("");
+    setPhotoForm({ url: "", legenda: "", categoria: "geral" });
+    try {
+      const fotos = tipo === "ordem"
+        ? await api.ordens.fotos(item.id)
+        : await api.embarcacoes.fotos(item.id);
+      setPhotoPanel({ tipo, item, fotos });
+    } catch (err) {
+      setPhotoMessage(err.message || "Nao foi possivel carregar as fotos");
+    }
+  };
+
+  const closePhotoPanel = () => {
+    setPhotoPanel(null);
+    setPhotoForm({ url: "", legenda: "", categoria: "geral" });
+    setPhotoMessage("");
+  };
+
+  const updatePhotoFile = (file) => {
+    setPhotoMessage("");
+    if (!file) {
+      setPhotoForm((current) => ({ ...current, url: "" }));
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setPhotoMessage("Selecione uma imagem valida.");
+      return;
+    }
+    if (file.size > 520000) {
+      setPhotoMessage("Use uma foto menor por enquanto. Limite aproximado: 500 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setPhotoForm((current) => ({ ...current, url: String(reader.result || "") }));
+    reader.onerror = () => setPhotoMessage("Nao foi possivel ler a foto.");
+    reader.readAsDataURL(file);
+  };
+
+  const savePhoto = async (event) => {
+    event.preventDefault();
+    if (!photoPanel) return;
+    if (!photoForm.url) {
+      setPhotoMessage("Selecione uma foto antes de salvar.");
+      return;
+    }
+    setPhotoSaving(true);
+    setPhotoMessage("");
+    try {
+      const saved = photoPanel.tipo === "ordem"
+        ? await api.ordens.adicionarFoto(photoPanel.item.id, photoForm)
+        : await api.embarcacoes.adicionarFoto(photoPanel.item.id, photoForm);
+      setPhotoPanel((current) => ({ ...current, fotos: [saved, ...current.fotos] }));
+      setPhotoForm({ url: "", legenda: "", categoria: "geral" });
+      setPhotoMessage("Foto salva com sucesso.");
+      if (photoPanel.tipo === "ordem") {
+        setOrdens((current) => current.map((os) => (
+          os.id === photoPanel.item.id ? { ...os, fotos: Number(os.fotos || 0) + 1 } : os
+        )));
+      }
+    } catch (err) {
+      setPhotoMessage(err.message || "Nao foi possivel salvar a foto");
+    } finally {
+      setPhotoSaving(false);
+    }
   };
 
   const updateOrderForm = (field, value) => {
@@ -594,6 +673,19 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
               <button type="submit" style={primarySmallButton}>{editingBoatId ? "Salvar embarcacao" : "Cadastrar embarcacao"}</button>
             </form>
 
+            {photoPanel?.tipo === "embarcacao" && (
+              <PhotoPanel
+                panel={photoPanel}
+                form={photoForm}
+                message={photoMessage}
+                saving={photoSaving}
+                onClose={closePhotoPanel}
+                onSubmit={savePhoto}
+                onFile={updatePhotoFile}
+                onChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
+              />
+            )}
+
             {boatHistory && (
               <HistoryPanel
                 title={`Historico de ${boatHistory.embarcacao.nome}`}
@@ -613,6 +705,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{embarcacao.cliente_nome || "Sem cliente"} · {embarcacao.tipo || "tipo livre"}</div>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <button type="button" onClick={() => openPhotoPanel("embarcacao", embarcacao)} style={ghostButton}>Fotos</button>
                       <button type="button" onClick={() => openBoatHistory(embarcacao)} style={ghostButton}>
                         {historyLoading === `embarcacao-${embarcacao.id}` ? "Abrindo..." : "Historico"}
                       </button>
@@ -678,6 +771,19 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                 {statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
+
+            {photoPanel?.tipo === "ordem" && (
+              <PhotoPanel
+                panel={photoPanel}
+                form={photoForm}
+                message={photoMessage}
+                saving={photoSaving}
+                onClose={closePhotoPanel}
+                onSubmit={savePhoto}
+                onFile={updatePhotoFile}
+                onChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
+              />
+            )}
 
             {showOrderForm && (
               <form onSubmit={saveOrder} style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
@@ -768,10 +874,11 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: os.prioridade === "urgente" ? C.rust : "rgba(255,255,255,0.5)" }}>{os.prioridade}</span>
                   <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.responsavel || "—"}</span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, marginTop: 12, alignItems: "center" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, marginTop: 12, alignItems: "center" }}>
                   <select value={os.status} onChange={(event) => updateOrderStatus(os.id, event.target.value)} style={inputStyle}>
                     {statusOptions.filter(([value]) => value !== "todos").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
+                  <button type="button" onClick={() => openPhotoPanel("ordem", os)} style={ghostButton}>Fotos ({Number(os.fotos || 0)})</button>
                   <button type="button" onClick={() => startEditOrder(os)} style={ghostButton}>Editar</button>
                 </div>
                 <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
@@ -1011,6 +1118,63 @@ function AgendaCard({ os, muted }) {
         <span style={tagStyle}>{os.prioridade || "normal"}</span>
       </div>
     </div>
+  );
+}
+
+function PhotoPanel({ panel, form, message, saving, onClose, onSubmit, onFile, onChange }) {
+  const title = panel.tipo === "ordem"
+    ? `Fotos da ${panel.item.codigo}`
+    : `Fotos de ${panel.item.nome}`;
+
+  return (
+    <section style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+        <div>
+          <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>{title}</div>
+          <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 3 }}>
+            {panel.fotos.length} foto(s) cadastrada(s)
+          </div>
+        </div>
+        <button type="button" onClick={onClose} style={ghostButton}>Fechar</button>
+      </div>
+
+      {message && <InlineMessage tone={message.includes("sucesso") ? "success" : "error"}>{message}</InlineMessage>}
+
+      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+          <Field label="Foto">
+            <input type="file" accept="image/*" onChange={(event) => onFile(event.target.files?.[0])} style={inputStyle} />
+          </Field>
+          <Field label="Categoria">
+            <select value={form.categoria} onChange={(event) => onChange("categoria", event.target.value)} style={inputStyle}>
+              {photoCategories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </Field>
+        </div>
+        <Field label="Legenda">
+          <input value={form.legenda} onChange={(event) => onChange("legenda", event.target.value)} style={inputStyle} placeholder="Ex.: antes do polimento" />
+        </Field>
+        {form.url && (
+          <img src={form.url} alt="Preview da foto" style={{ width: 140, height: 100, objectFit: "cover", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)" }} />
+        )}
+        <button type="submit" disabled={saving} style={primarySmallButton}>{saving ? "Salvando..." : "Salvar foto"}</button>
+      </form>
+
+      {panel.fotos.length === 0 && <StateMessage title="Nenhuma foto ainda" body="Anexe fotos para registrar antes, durante, depois ou documentos." compact />}
+      {panel.fotos.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+          {panel.fotos.map((foto) => (
+            <div key={foto.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 8 }}>
+              <img src={foto.url} alt={foto.legenda || "Foto"} style={{ width: "100%", height: 110, objectFit: "cover", borderRadius: 10 }} />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                <span style={tagStyle}>{foto.categoria || "geral"}</span>
+              </div>
+              {foto.legenda && <div style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, marginTop: 6 }}>{foto.legenda}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

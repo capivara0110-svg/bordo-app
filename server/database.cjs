@@ -136,6 +136,11 @@ async function createSchema() {
     `CREATE TABLE IF NOT EXISTS os_tarefas (
       id ${id}, os_id INTEGER NOT NULL, tarefa TEXT NOT NULL, done INTEGER DEFAULT 0
     )`,
+    `CREATE TABLE IF NOT EXISTS fotos (
+      id ${id}, empresa_id INTEGER, tipo TEXT NOT NULL, referencia_id INTEGER NOT NULL,
+      url TEXT NOT NULL, legenda TEXT DEFAULT '', categoria TEXT DEFAULT 'geral',
+      criado_em TIMESTAMP DEFAULT ${now}
+    )`,
     `CREATE TABLE IF NOT EXISTS notificacoes (
       id ${id}, empresa_id INTEGER, usuario_id INTEGER NOT NULL, tipo TEXT DEFAULT 'info',
       lida INTEGER DEFAULT 0, icone TEXT DEFAULT '', titulo TEXT NOT NULL, corpo TEXT DEFAULT '',
@@ -164,6 +169,7 @@ async function migrateTenantColumns() {
     "clientes",
     "embarcacoes",
     "ordens_servico",
+    "fotos",
     "notificacoes",
     "bercos",
   ]) {
@@ -196,6 +202,7 @@ async function migrateTenantColumns() {
     "clientes",
     "embarcacoes",
     "ordens_servico",
+    "fotos",
     "notificacoes",
     "bercos",
   ]) {
@@ -209,6 +216,7 @@ async function migrateTenantColumns() {
     await execute("CREATE INDEX IF NOT EXISTS idx_tripulacao_empresa ON tripulacao (empresa_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_clientes_empresa ON clientes (empresa_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_embarcacoes_empresa ON embarcacoes (empresa_id)");
+    await execute("CREATE INDEX IF NOT EXISTS idx_fotos_referencia ON fotos (empresa_id, tipo, referencia_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_bercos_empresa ON bercos (empresa_id)");
   }
 }

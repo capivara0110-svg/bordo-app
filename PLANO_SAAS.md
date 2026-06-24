@@ -58,12 +58,12 @@ Publico principal:
 
 ### Fase 1 - Fotos e evidencia do servico
 
-- [ ] Fotos na OS
-- [ ] Fotos na embarcacao
-- [ ] Galeria simples por OS
-- [ ] Galeria simples por embarcacao
-- [ ] Descricao curta por foto
-- [ ] Tipo de foto: antes, durante, depois, documento ou geral
+- [x] Fotos na OS
+- [x] Fotos na embarcacao
+- [x] Galeria simples por OS
+- [x] Galeria simples por embarcacao
+- [x] Descricao curta por foto
+- [x] Tipo de foto: antes, durante, depois, documento ou geral
 - [ ] Preparar armazenamento externo para producao
 
 ### Fase 2 - Prestadores e equipe operacional
@@ -137,4 +137,3 @@ Publico principal:
 4. Materiais e horas trabalhadas
 5. Relatorio/laudo com fotos
 6. Portal do cliente
-

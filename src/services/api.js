@@ -126,6 +126,12 @@ export const api = {
   embarcacoes: {
     listar: () => request("/embarcacoes"),
     historico: (id) => request(`/embarcacoes/${id}/historico`),
+    fotos: (id) => request(`/embarcacoes/${id}/fotos`),
+    adicionarFoto: (id, dados) =>
+      request(`/embarcacoes/${id}/fotos`, {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
     criar: (dados) =>
       request("/embarcacoes", {
         method: "POST",
@@ -160,6 +166,12 @@ export const api = {
       request(`/ordens/${id}/tarefas`, {
         method: "POST",
         body: JSON.stringify({ tarefa }),
+      }),
+    fotos: (id) => request(`/ordens/${id}/fotos`),
+    adicionarFoto: (id, dados) =>
+      request(`/ordens/${id}/fotos`, {
+        method: "POST",
+        body: JSON.stringify(dados),
       }),
     toggleTarefa: (id, tarefaId) =>
       request(`/ordens/${id}/tarefa/${tarefaId}`, { method: "PUT" }),

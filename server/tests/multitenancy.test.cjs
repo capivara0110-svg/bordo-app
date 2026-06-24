@@ -152,6 +152,34 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   assert.equal(firstAgenda.body[0].previsao, "2026-07-02");
   assert.equal(secondAgenda.body.length, 0);
 
+  const samplePhoto = "data:image/png;base64,iVBORw0KGgo=";
+  const orderPhoto = await request(`/ordens/${createdOrder.body.id}/fotos`, {
+    method: "POST",
+    body: JSON.stringify({ url: samplePhoto, legenda: "Antes do servico", categoria: "antes" }),
+  }, first.body.token);
+  assert.equal(orderPhoto.status, 201);
+  assert.equal(orderPhoto.body.categoria, "antes");
+
+  const orderPhotos = await request(`/ordens/${createdOrder.body.id}/fotos`, {}, first.body.token);
+  assert.equal(orderPhotos.status, 200);
+  assert.equal(orderPhotos.body.length, 1);
+
+  const deniedOrderPhotos = await request(`/ordens/${createdOrder.body.id}/fotos`, {}, second.body.token);
+  assert.equal(deniedOrderPhotos.status, 404);
+
+  const boatPhoto = await request(`/embarcacoes/${createdBoat.body.id}/fotos`, {
+    method: "POST",
+    body: JSON.stringify({ url: samplePhoto, legenda: "Casco", categoria: "geral" }),
+  }, first.body.token);
+  assert.equal(boatPhoto.status, 201);
+
+  const boatPhotos = await request(`/embarcacoes/${createdBoat.body.id}/fotos`, {}, first.body.token);
+  assert.equal(boatPhotos.status, 200);
+  assert.equal(boatPhotos.body.length, 1);
+
+  const deniedBoatPhotos = await request(`/embarcacoes/${createdBoat.body.id}/fotos`, {}, second.body.token);
+  assert.equal(deniedBoatPhotos.status, 404);
+
   const clientHistory = await request(`/clientes/${createdClient.body.id}/historico`, {}, first.body.token);
   assert.equal(clientHistory.status, 200);
   assert.equal(clientHistory.body.cliente.nome, "Cliente Marina");
