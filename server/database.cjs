@@ -114,9 +114,21 @@ async function createSchema() {
       quantidade INTEGER DEFAULT 0, minimo INTEGER DEFAULT 0, categoria TEXT DEFAULT 'Geral',
       criado_em TIMESTAMP DEFAULT ${now}
     )`,
+    `CREATE TABLE IF NOT EXISTS clientes (
+      id ${id}, empresa_id INTEGER, nome TEXT NOT NULL, documento TEXT DEFAULT '',
+      telefone TEXT DEFAULT '', email TEXT DEFAULT '', observacao TEXT DEFAULT '',
+      criado_em TIMESTAMP DEFAULT ${now}
+    )`,
+    `CREATE TABLE IF NOT EXISTS embarcacoes (
+      id ${id}, empresa_id INTEGER, cliente_id INTEGER, nome TEXT NOT NULL,
+      tipo TEXT DEFAULT '', marca TEXT DEFAULT '', modelo TEXT DEFAULT '',
+      tamanho TEXT DEFAULT '', registro TEXT DEFAULT '', observacao TEXT DEFAULT '',
+      criado_em TIMESTAMP DEFAULT ${now}
+    )`,
     `CREATE TABLE IF NOT EXISTS ordens_servico (
       id ${id}, empresa_id INTEGER, codigo TEXT UNIQUE NOT NULL, embarcacao TEXT NOT NULL,
-      cliente TEXT DEFAULT '', tipo TEXT DEFAULT 'Servico', prioridade TEXT DEFAULT 'normal',
+      cliente TEXT DEFAULT '', cliente_id INTEGER, embarcacao_id INTEGER,
+      tipo TEXT DEFAULT 'Servico', prioridade TEXT DEFAULT 'normal',
       status TEXT DEFAULT 'aguardando', descricao TEXT DEFAULT '', responsavel TEXT DEFAULT '',
       abertura TEXT DEFAULT '', previsao TEXT DEFAULT '', fotos INTEGER DEFAULT 0,
       observacao TEXT DEFAULT '', criado_em TIMESTAMP DEFAULT ${now}
@@ -149,12 +161,16 @@ async function migrateTenantColumns() {
     "checklist",
     "tripulacao",
     "estoque",
+    "clientes",
+    "embarcacoes",
     "ordens_servico",
     "notificacoes",
     "bercos",
   ]) {
     await addColumn(table, "empresa_id INTEGER");
   }
+  await addColumn("ordens_servico", "cliente_id INTEGER");
+  await addColumn("ordens_servico", "embarcacao_id INTEGER");
 
   let empresa = await get("SELECT id FROM empresas ORDER BY id LIMIT 1");
   if (!empresa) {
@@ -177,6 +193,8 @@ async function migrateTenantColumns() {
     "checklist",
     "tripulacao",
     "estoque",
+    "clientes",
+    "embarcacoes",
     "ordens_servico",
     "notificacoes",
     "bercos",
@@ -189,6 +207,8 @@ async function migrateTenantColumns() {
     await execute("CREATE INDEX IF NOT EXISTS idx_ordens_empresa ON ordens_servico (empresa_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_estoque_empresa ON estoque (empresa_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_tripulacao_empresa ON tripulacao (empresa_id)");
+    await execute("CREATE INDEX IF NOT EXISTS idx_clientes_empresa ON clientes (empresa_id)");
+    await execute("CREATE INDEX IF NOT EXISTS idx_embarcacoes_empresa ON embarcacoes (empresa_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_bercos_empresa ON bercos (empresa_id)");
   }
 }

@@ -98,16 +98,49 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   assert.equal(firstCompany.body.assinatura.plano, "trial");
   assert.equal(firstCompany.body.assinatura.limites.usuarios, 3);
 
+  const createdClient = await request("/clientes", {
+    method: "POST",
+    body: JSON.stringify({
+      nome: "Cliente Marina",
+      telefone: "11999999999",
+      email: "cliente@teste.local",
+    }),
+  }, first.body.token);
+  assert.equal(createdClient.status, 201);
+  assert.equal(createdClient.body.nome, "Cliente Marina");
+
+  const createdBoat = await request("/embarcacoes", {
+    method: "POST",
+    body: JSON.stringify({
+      cliente_id: createdClient.body.id,
+      nome: "Lancha Privada",
+      tipo: "Lancha",
+      tamanho: "32 pes",
+    }),
+  }, first.body.token);
+  assert.equal(createdBoat.status, 201);
+  assert.equal(createdBoat.body.cliente_nome, "Cliente Marina");
+
+  const secondClients = await request("/clientes", {}, second.body.token);
+  const secondBoats = await request("/embarcacoes", {}, second.body.token);
+  assert.equal(secondClients.body.length, 0);
+  assert.equal(secondBoats.body.length, 0);
+
   const createdOrder = await request("/ordens", {
     method: "POST",
     body: JSON.stringify({
-      embarcacao: "Lancha Privada",
+      cliente_id: createdClient.body.id,
+      embarcacao_id: createdBoat.body.id,
       tipo: "Revisao",
       tarefas: ["Avaliar motor", "Testar navegacao"],
     }),
   }, first.body.token);
   assert.equal(createdOrder.status, 201);
   assert.equal(createdOrder.body.itens.length, 2);
+  assert.equal(createdOrder.body.cliente, "Cliente Marina");
+  assert.equal(createdOrder.body.embarcacao, "Lancha Privada");
+  assert.equal(createdOrder.body.cliente_id, createdClient.body.id);
+  assert.equal(createdOrder.body.embarcacao_id, createdBoat.body.id);
 
   const editedOrder = await request(`/ordens/${createdOrder.body.id}`, {
     method: "PUT",

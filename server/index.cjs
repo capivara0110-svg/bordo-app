@@ -17,6 +17,8 @@ app.use("/api/diario", require("./routes/diario.cjs"));
 app.use("/api/checklist", require("./routes/checklist.cjs"));
 app.use("/api/tripulacao", require("./routes/tripulacao.cjs"));
 app.use("/api/estoque", require("./routes/estoque.cjs"));
+app.use("/api/clientes", require("./routes/clientes.cjs"));
+app.use("/api/embarcacoes", require("./routes/embarcacoes.cjs"));
 app.use("/api/ordens", require("./routes/ordens.cjs"));
 app.use("/api/notificacoes", require("./routes/notificacoes.cjs"));
 app.use("/api/bercos", require("./routes/bercos.cjs"));

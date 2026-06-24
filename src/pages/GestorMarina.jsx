@@ -5,6 +5,8 @@ import StatusBadge from "../components/StatusBadge.jsx";
 import Header from "../components/Header.jsx";
 
 const emptyOrder = {
+  cliente_id: "",
+  embarcacao_id: "",
   embarcacao: "",
   cliente: "",
   tipo: "Servico",
@@ -15,6 +17,25 @@ const emptyOrder = {
   previsao: "",
   observacao: "",
   tarefas: "",
+};
+
+const emptyClient = {
+  nome: "",
+  documento: "",
+  telefone: "",
+  email: "",
+  observacao: "",
+};
+
+const emptyBoat = {
+  cliente_id: "",
+  nome: "",
+  tipo: "",
+  marca: "",
+  modelo: "",
+  tamanho: "",
+  registro: "",
+  observacao: "",
 };
 
 const statusOptions = [
@@ -41,6 +62,8 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [ordens, setOrdens] = useState([]);
   const [equipe, setEquipe] = useState([]);
   const [bercos, setBercos] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [embarcacoes, setEmbarcacoes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [orderForm, setOrderForm] = useState(emptyOrder);
@@ -51,9 +74,17 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [orderFilter, setOrderFilter] = useState("todos");
   const [orderSearch, setOrderSearch] = useState("");
   const [newTask, setNewTask] = useState({});
+  const [clientForm, setClientForm] = useState(emptyClient);
+  const [boatForm, setBoatForm] = useState(emptyBoat);
+  const [editingClientId, setEditingClientId] = useState(null);
+  const [editingBoatId, setEditingBoatId] = useState(null);
+  const [clientMessage, setClientMessage] = useState("");
+  const [boatMessage, setBoatMessage] = useState("");
 
   const tabs = [
     { id: "dashboard", icon: "📊", label: "Painel" },
+    { id: "clientes", icon: "🧾", label: "Clientes" },
+    { id: "embarcacoes", icon: "🛥️", label: "Barcos" },
     { id: "equipe", icon: "👥", label: "Equipe" },
     { id: "ordens", icon: "🔧", label: "Ordens" },
     { id: "bercos", icon: "⚓", label: "Berços" },
@@ -64,16 +95,20 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       setLoading(true);
       setError("");
       try {
-        const [dash, ord, trip, ber] = await Promise.all([
+        const [dash, ord, trip, ber, cli, emb] = await Promise.all([
           api.dashboard.dados(),
           api.ordens.listar(),
           api.tripulacao.listar(),
           api.bercos.listar(),
+          api.clientes.listar(),
+          api.embarcacoes.listar(),
         ]);
         setDashboard(dash);
         setOrdens(ord);
         setEquipe(trip);
         setBercos(ber);
+        setClientes(cli);
+        setEmbarcacoes(emb);
       } catch (err) {
         console.error("Erro ao carregar dashboard:", err);
         setError(err.message || "Nao foi possivel carregar o painel");
@@ -94,6 +129,31 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     setOrderMessage("");
   };
 
+  const selectOrderClient = (id) => {
+    const cliente = clientes.find((item) => String(item.id) === String(id));
+    setOrderForm((current) => ({
+      ...current,
+      cliente_id: id,
+      cliente: cliente?.nome || current.cliente,
+    }));
+    setOrderMessage("");
+  };
+
+  const selectOrderBoat = (id) => {
+    const embarcacao = embarcacoes.find((item) => String(item.id) === String(id));
+    const cliente = embarcacao?.cliente_id
+      ? clientes.find((item) => String(item.id) === String(embarcacao.cliente_id))
+      : null;
+    setOrderForm((current) => ({
+      ...current,
+      embarcacao_id: id,
+      embarcacao: embarcacao?.nome || current.embarcacao,
+      cliente_id: cliente?.id || current.cliente_id,
+      cliente: cliente?.nome || embarcacao?.cliente_nome || current.cliente,
+    }));
+    setOrderMessage("");
+  };
+
   const startNewOrder = () => {
     setOrderForm(emptyOrder);
     setEditingOrderId(null);
@@ -103,6 +163,8 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
 
   const startEditOrder = (order) => {
     setOrderForm({
+      cliente_id: order.cliente_id || "",
+      embarcacao_id: order.embarcacao_id || "",
       embarcacao: order.embarcacao || "",
       cliente: order.cliente || "",
       tipo: order.tipo || "Servico",
@@ -179,6 +241,95 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     }
   };
 
+  const updateClientForm = (field, value) => {
+    setClientForm((current) => ({ ...current, [field]: value }));
+    setClientMessage("");
+  };
+
+  const editClient = (cliente) => {
+    setClientForm({
+      nome: cliente.nome || "",
+      documento: cliente.documento || "",
+      telefone: cliente.telefone || "",
+      email: cliente.email || "",
+      observacao: cliente.observacao || "",
+    });
+    setEditingClientId(cliente.id);
+    setClientMessage("");
+  };
+
+  const clearClientForm = () => {
+    setClientForm(emptyClient);
+    setEditingClientId(null);
+  };
+
+  const saveClient = async (event) => {
+    event.preventDefault();
+    setClientMessage("");
+    try {
+      const saved = editingClientId
+        ? await api.clientes.editar(editingClientId, clientForm)
+        : await api.clientes.criar(clientForm);
+      setClientes((current) => {
+        const exists = current.some((item) => item.id === saved.id);
+        const next = exists
+          ? current.map((item) => (item.id === saved.id ? saved : item))
+          : [...current, saved];
+        return next.sort((a, b) => a.nome.localeCompare(b.nome));
+      });
+      setClientMessage(editingClientId ? "Cliente atualizado com sucesso." : "Cliente cadastrado com sucesso.");
+      clearClientForm();
+    } catch (err) {
+      setClientMessage(err.message || "Nao foi possivel salvar o cliente");
+    }
+  };
+
+  const updateBoatForm = (field, value) => {
+    setBoatForm((current) => ({ ...current, [field]: value }));
+    setBoatMessage("");
+  };
+
+  const editBoat = (embarcacao) => {
+    setBoatForm({
+      cliente_id: embarcacao.cliente_id || "",
+      nome: embarcacao.nome || "",
+      tipo: embarcacao.tipo || "",
+      marca: embarcacao.marca || "",
+      modelo: embarcacao.modelo || "",
+      tamanho: embarcacao.tamanho || "",
+      registro: embarcacao.registro || "",
+      observacao: embarcacao.observacao || "",
+    });
+    setEditingBoatId(embarcacao.id);
+    setBoatMessage("");
+  };
+
+  const clearBoatForm = () => {
+    setBoatForm(emptyBoat);
+    setEditingBoatId(null);
+  };
+
+  const saveBoat = async (event) => {
+    event.preventDefault();
+    setBoatMessage("");
+    try {
+      const saved = editingBoatId
+        ? await api.embarcacoes.editar(editingBoatId, boatForm)
+        : await api.embarcacoes.criar(boatForm);
+      setEmbarcacoes((current) => {
+        const exists = current.some((item) => item.id === saved.id);
+        const next = exists
+          ? current.map((item) => (item.id === saved.id ? saved : item))
+          : [...current, saved];
+        return next.sort((a, b) => a.nome.localeCompare(b.nome));
+      });
+      setBoatMessage(editingBoatId ? "Embarcacao atualizada com sucesso." : "Embarcacao cadastrada com sucesso.");
+      clearBoatForm();
+    } catch (err) {
+      setBoatMessage(err.message || "Nao foi possivel salvar a embarcacao");
+    }
+  };
+
   const renderTab = () => {
     if (loading) return <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Carregando...</div>;
     if (error) return <StateMessage title="Nao foi possivel carregar o painel" body={error} />;
@@ -227,6 +378,142 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
               ))}
               </div>
               )}
+            </div>
+          </div>
+        );
+
+      case "clientes":
+        return (
+          <div className="bordo-page-body">
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Clientes</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{clientes.length} clientes cadastrados</div>
+            </div>
+
+            {clientMessage && <InlineMessage tone={clientMessage.includes("sucesso") ? "success" : "error"}>{clientMessage}</InlineMessage>}
+
+            <form onSubmit={saveClient} style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>
+                    {editingClientId ? "Editar cliente" : "Novo cliente"}
+                  </div>
+                  <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 3 }}>
+                    Base comercial para OS, embarcacoes e historico.
+                  </div>
+                </div>
+                {editingClientId && <button type="button" onClick={clearClientForm} style={ghostButton}>Cancelar</button>}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                <Field label="Nome">
+                  <input required value={clientForm.nome} onChange={(event) => updateClientForm("nome", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Telefone">
+                  <input value={clientForm.telefone} onChange={(event) => updateClientForm("telefone", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Email">
+                  <input type="email" value={clientForm.email} onChange={(event) => updateClientForm("email", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Documento">
+                  <input value={clientForm.documento} onChange={(event) => updateClientForm("documento", event.target.value)} style={inputStyle} />
+                </Field>
+              </div>
+              <Field label="Observacao">
+                <textarea value={clientForm.observacao} onChange={(event) => updateClientForm("observacao", event.target.value)} style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
+              </Field>
+              <button type="submit" style={primarySmallButton}>{editingClientId ? "Salvar cliente" : "Cadastrar cliente"}</button>
+            </form>
+
+            <div className="bordo-list-grid">
+              {clientes.length === 0 && <StateMessage title="Nenhum cliente cadastrado" body="Cadastre o primeiro cliente para acelerar a abertura de OS." compact />}
+              {clientes.map((cliente) => (
+                <div key={cliente.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{cliente.nome}</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{cliente.telefone || "Sem telefone"} · {cliente.email || "sem email"}</div>
+                    </div>
+                    <button type="button" onClick={() => editClient(cliente)} style={ghostButton}>Editar</button>
+                  </div>
+                  {cliente.observacao && <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", margin: "10px 0 0" }}>{cliente.observacao}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case "embarcacoes":
+        return (
+          <div className="bordo-page-body">
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Embarcacoes</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{embarcacoes.length} barcos cadastrados</div>
+            </div>
+
+            {boatMessage && <InlineMessage tone={boatMessage.includes("sucesso") ? "success" : "error"}>{boatMessage}</InlineMessage>}
+
+            <form onSubmit={saveBoat} style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>
+                    {editingBoatId ? "Editar embarcacao" : "Nova embarcacao"}
+                  </div>
+                  <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 3 }}>
+                    Vincule o barco ao cliente para abrir OS com poucos cliques.
+                  </div>
+                </div>
+                {editingBoatId && <button type="button" onClick={clearBoatForm} style={ghostButton}>Cancelar</button>}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                <Field label="Nome da embarcacao">
+                  <input required value={boatForm.nome} onChange={(event) => updateBoatForm("nome", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Cliente">
+                  <select value={boatForm.cliente_id} onChange={(event) => updateBoatForm("cliente_id", event.target.value)} style={inputStyle}>
+                    <option value="">Sem cliente vinculado</option>
+                    {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome}</option>)}
+                  </select>
+                </Field>
+                <Field label="Tipo">
+                  <input value={boatForm.tipo} onChange={(event) => updateBoatForm("tipo", event.target.value)} style={inputStyle} placeholder="Lancha, veleiro..." />
+                </Field>
+                <Field label="Tamanho">
+                  <input value={boatForm.tamanho} onChange={(event) => updateBoatForm("tamanho", event.target.value)} style={inputStyle} placeholder="32 pes" />
+                </Field>
+                <Field label="Marca">
+                  <input value={boatForm.marca} onChange={(event) => updateBoatForm("marca", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Modelo">
+                  <input value={boatForm.modelo} onChange={(event) => updateBoatForm("modelo", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Registro">
+                  <input value={boatForm.registro} onChange={(event) => updateBoatForm("registro", event.target.value)} style={inputStyle} />
+                </Field>
+              </div>
+              <Field label="Observacao">
+                <textarea value={boatForm.observacao} onChange={(event) => updateBoatForm("observacao", event.target.value)} style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
+              </Field>
+              <button type="submit" style={primarySmallButton}>{editingBoatId ? "Salvar embarcacao" : "Cadastrar embarcacao"}</button>
+            </form>
+
+            <div className="bordo-list-grid">
+              {embarcacoes.length === 0 && <StateMessage title="Nenhuma embarcacao cadastrada" body="Cadastre barcos para a OS puxar cliente e dados automaticamente." compact />}
+              {embarcacoes.map((embarcacao) => (
+                <div key={embarcacao.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{embarcacao.nome}</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{embarcacao.cliente_nome || "Sem cliente"} · {embarcacao.tipo || "tipo livre"}</div>
+                    </div>
+                    <button type="button" onClick={() => editBoat(embarcacao)} style={ghostButton}>Editar</button>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                    {[embarcacao.tamanho, embarcacao.marca, embarcacao.modelo, embarcacao.registro].filter(Boolean).map((item) => (
+                      <span key={item} style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{item}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         );
@@ -294,6 +581,22 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <button type="button" onClick={closeOrderForm} style={ghostButton}>Cancelar</button>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                  <Field label="Barco cadastrado">
+                    <select value={orderForm.embarcacao_id} onChange={(event) => selectOrderBoat(event.target.value)} style={inputStyle}>
+                      <option value="">Digitar manualmente</option>
+                      {embarcacoes.map((embarcacao) => (
+                        <option key={embarcacao.id} value={embarcacao.id}>
+                          {embarcacao.nome}{embarcacao.cliente_nome ? ` - ${embarcacao.cliente_nome}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Cliente cadastrado">
+                    <select value={orderForm.cliente_id} onChange={(event) => selectOrderClient(event.target.value)} style={inputStyle}>
+                      <option value="">Digitar manualmente</option>
+                      {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome}</option>)}
+                    </select>
+                  </Field>
                   <Field label="Embarcacao">
                     <input required value={orderForm.embarcacao} onChange={(event) => updateOrderForm("embarcacao", event.target.value)} style={inputStyle} />
                   </Field>

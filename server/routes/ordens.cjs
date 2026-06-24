@@ -34,6 +34,28 @@ function cleanTaskList(value) {
     .filter(Boolean);
 }
 
+function clean(value) {
+  return String(value || "").trim();
+}
+
+async function resolveCliente(value, empresaId) {
+  const id = Number(value) || null;
+  if (!id) return null;
+  return db.prepare("SELECT id, nome FROM clientes WHERE id = ? AND empresa_id = ?")
+    .get(id, empresaId);
+}
+
+async function resolveEmbarcacao(value, empresaId) {
+  const id = Number(value) || null;
+  if (!id) return null;
+  return db.prepare(
+    `SELECT e.id, e.nome, e.cliente_id, c.nome AS cliente_nome
+     FROM embarcacoes e
+     LEFT JOIN clientes c ON c.id = e.cliente_id AND c.empresa_id = e.empresa_id
+     WHERE e.id = ? AND e.empresa_id = ?`,
+  ).get(id, empresaId);
+}
+
 router.get("/", auth, async (req, res) => {
   const ordens = await db.prepare(
     `SELECT * FROM ordens_servico
@@ -52,7 +74,14 @@ router.get("/", auth, async (req, res) => {
 });
 
 router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"), async (req, res) => {
-  const { embarcacao, cliente, tipo, prioridade, descricao, responsavel, previsao, tarefas } = req.body;
+  const { tipo, prioridade, descricao, responsavel, previsao, tarefas } = req.body;
+  const selectedCliente = await resolveCliente(req.body.cliente_id, req.usuario.empresa_id);
+  const selectedEmbarcacao = await resolveEmbarcacao(req.body.embarcacao_id, req.usuario.empresa_id);
+  const embarcacao = selectedEmbarcacao?.nome || clean(req.body.embarcacao);
+  const cliente = selectedCliente?.nome || selectedEmbarcacao?.cliente_nome || clean(req.body.cliente);
+  const clienteId = selectedCliente?.id || selectedEmbarcacao?.cliente_id || null;
+  const embarcacaoId = selectedEmbarcacao?.id || null;
+
   if (!embarcacao) {
     return res.status(400).json({ erro: "Embarcacao obrigatoria" });
   }
@@ -65,13 +94,15 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
 
   const result = await db.prepare(
     `INSERT INTO ordens_servico
-     (empresa_id,codigo,embarcacao,cliente,tipo,prioridade,descricao,responsavel,previsao)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
+     (empresa_id,codigo,embarcacao,cliente,cliente_id,embarcacao_id,tipo,prioridade,descricao,responsavel,previsao)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     req.usuario.empresa_id,
     codigo,
     embarcacao,
-    cliente || "",
+    cliente,
+    clienteId,
+    embarcacaoId,
     tipo || "Servico",
     allowedPriorities.includes(prioridade) ? prioridade : "normal",
     descricao || "",
@@ -92,9 +123,24 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
   const current = await getOrder(req.params.id, req.usuario.empresa_id);
   if (!current) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
+  const selectedCliente = Object.prototype.hasOwnProperty.call(req.body, "cliente_id")
+    ? await resolveCliente(req.body.cliente_id, req.usuario.empresa_id)
+    : null;
+  const selectedEmbarcacao = Object.prototype.hasOwnProperty.call(req.body, "embarcacao_id")
+    ? await resolveEmbarcacao(req.body.embarcacao_id, req.usuario.empresa_id)
+    : null;
+  const clienteId = Object.prototype.hasOwnProperty.call(req.body, "cliente_id")
+    ? selectedCliente?.id || selectedEmbarcacao?.cliente_id || null
+    : current.cliente_id;
+  const embarcacaoId = Object.prototype.hasOwnProperty.call(req.body, "embarcacao_id")
+    ? selectedEmbarcacao?.id || null
+    : current.embarcacao_id;
+
   const fields = {
-    embarcacao: String(req.body.embarcacao ?? current.embarcacao).trim(),
-    cliente: String(req.body.cliente ?? current.cliente ?? "").trim(),
+    embarcacao: selectedEmbarcacao?.nome || String(req.body.embarcacao ?? current.embarcacao).trim(),
+    cliente: selectedCliente?.nome || selectedEmbarcacao?.cliente_nome || String(req.body.cliente ?? current.cliente ?? "").trim(),
+    cliente_id: clienteId,
+    embarcacao_id: embarcacaoId,
     tipo: String(req.body.tipo ?? current.tipo ?? "Servico").trim() || "Servico",
     prioridade: allowedPriorities.includes(req.body.prioridade) ? req.body.prioridade : current.prioridade,
     status: allowedStatus.includes(req.body.status) ? req.body.status : current.status,
@@ -110,12 +156,15 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
 
   await db.prepare(
     `UPDATE ordens_servico
-     SET embarcacao = ?, cliente = ?, tipo = ?, prioridade = ?, status = ?,
+     SET embarcacao = ?, cliente = ?, cliente_id = ?, embarcacao_id = ?,
+         tipo = ?, prioridade = ?, status = ?,
          descricao = ?, responsavel = ?, previsao = ?, observacao = ?
      WHERE id = ? AND empresa_id = ?`,
   ).run(
     fields.embarcacao,
     fields.cliente,
+    fields.cliente_id,
+    fields.embarcacao_id,
     fields.tipo,
     fields.prioridade,
     fields.status,

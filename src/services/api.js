@@ -107,6 +107,35 @@ export const api = {
       }),
   },
 
+  // ─── CADASTROS OPERACIONAIS ───────────────────────────
+  clientes: {
+    listar: () => request("/clientes"),
+    criar: (dados) =>
+      request("/clientes", {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
+    editar: (id, dados) =>
+      request(`/clientes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(dados),
+      }),
+  },
+
+  embarcacoes: {
+    listar: () => request("/embarcacoes"),
+    criar: (dados) =>
+      request("/embarcacoes", {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
+    editar: (id, dados) =>
+      request(`/embarcacoes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(dados),
+      }),
+  },
+
   // ─── ORDENS DE SERVIÇO ────────────────────────────────
   ordens: {
     listar: () => request("/ordens"),
