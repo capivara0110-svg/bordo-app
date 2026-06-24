@@ -54,6 +54,14 @@ const priorityOptions = [
   ["urgente", "Urgente"],
 ];
 
+function dateKey(value) {
+  return String(value || "").slice(0, 10);
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [tab, setTab] = useState("dashboard");
 
@@ -64,6 +72,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [bercos, setBercos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [embarcacoes, setEmbarcacoes] = useState([]);
+  const [agenda, setAgenda] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [orderForm, setOrderForm] = useState(emptyOrder);
@@ -88,6 +97,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     { id: "dashboard", icon: "📊", label: "Painel" },
     { id: "clientes", icon: "🧾", label: "Clientes" },
     { id: "embarcacoes", icon: "🛥️", label: "Barcos" },
+    { id: "agenda", icon: "📅", label: "Agenda" },
     { id: "equipe", icon: "👥", label: "Equipe" },
     { id: "ordens", icon: "🔧", label: "Ordens" },
     { id: "bercos", icon: "⚓", label: "Berços" },
@@ -98,13 +108,14 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       setLoading(true);
       setError("");
       try {
-        const [dash, ord, trip, ber, cli, emb] = await Promise.all([
+        const [dash, ord, trip, ber, cli, emb, agd] = await Promise.all([
           api.dashboard.dados(),
           api.ordens.listar(),
           api.tripulacao.listar(),
           api.bercos.listar(),
           api.clientes.listar(),
           api.embarcacoes.listar(),
+          api.agenda.listar(),
         ]);
         setDashboard(dash);
         setOrdens(ord);
@@ -112,6 +123,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
         setBercos(ber);
         setClientes(cli);
         setEmbarcacoes(emb);
+        setAgenda(agd);
       } catch (err) {
         console.error("Erro ao carregar dashboard:", err);
         setError(err.message || "Nao foi possivel carregar o painel");
@@ -126,6 +138,10 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     const text = `${os.codigo} ${os.embarcacao} ${os.cliente} ${os.responsavel} ${os.descricao}`.toLowerCase();
     return matchesStatus && text.includes(orderSearch.trim().toLowerCase());
   });
+
+  const refreshAgenda = async () => {
+    setAgenda(await api.agenda.listar());
+  };
 
   const updateOrderForm = (field, value) => {
     setOrderForm((current) => ({ ...current, [field]: value }));
@@ -206,6 +222,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
           : [saved, ...current];
       });
       setOrderMessage(editingOrderId ? "OS atualizada com sucesso." : "OS criada com sucesso.");
+      await refreshAgenda();
       closeOrderForm();
     } catch (err) {
       setOrderMessage(err.message || "Nao foi possivel salvar a OS");
@@ -218,6 +235,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     try {
       const updated = await api.ordens.atualizarStatus(orderId, status);
       setOrdens((current) => current.map((item) => (item.id === orderId ? updated : item)));
+      await refreshAgenda();
     } catch (err) {
       setOrderMessage(err.message || "Nao foi possivel alterar o status");
     }
@@ -408,6 +426,45 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
             </div>
           </div>
         );
+
+      case "agenda": {
+        const hoje = todayKey();
+        const atrasadas = agenda.filter((os) => dateKey(os.previsao) < hoje && os.status !== "concluida");
+        const hojeAgenda = agenda.filter((os) => dateKey(os.previsao) === hoje && os.status !== "concluida");
+        const proximas = agenda.filter((os) => dateKey(os.previsao) > hoje && os.status !== "concluida");
+        const concluidas = agenda.filter((os) => os.status === "concluida");
+
+        return (
+          <div className="bordo-page-body">
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Agenda</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{agenda.length} servicos com previsao</div>
+              <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 4 }}>
+                Planejamento da oficina/marina baseado na previsao da OS.
+              </div>
+            </div>
+
+            <div className="bordo-card-grid">
+              {[
+                { label: "Atrasadas", value: atrasadas.length, color: C.rust },
+                { label: "Hoje", value: hojeAgenda.length, color: C.gold },
+                { label: "Proximas", value: proximas.length, color: C.aqua },
+                { label: "Concluidas", value: concluidas.length, color: C.green },
+              ].map((item) => (
+                <div key={item.label} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14 }}>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.42)", fontWeight: 700 }}>{item.label}</div>
+                  <div style={{ fontSize: 24, color: item.color, fontWeight: 900, fontFamily: fonts.display }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <AgendaSection title="Atrasadas" items={atrasadas} empty="Nenhum servico atrasado." />
+            <AgendaSection title="Hoje" items={hojeAgenda} empty="Nada previsto para hoje." />
+            <AgendaSection title="Proximas" items={proximas} empty="Nenhum servico futuro com previsao." />
+            <AgendaSection title="Concluidas" items={concluidas} empty="Nenhum servico previsto foi concluido ainda." muted />
+          </div>
+        );
+      }
 
       case "clientes":
         return (
@@ -917,6 +974,43 @@ function HistoryPanel({ title, subtitle, ordens, onClose }) {
         </div>
       ))}
     </section>
+  );
+}
+
+function AgendaSection({ title, items, empty, muted = false }) {
+  return (
+    <section style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ color: muted ? "rgba(255,255,255,0.42)" : C.white, fontWeight: 800, fontFamily: fonts.display }}>{title}</div>
+        <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>{items.length} OS</span>
+      </div>
+      {items.length === 0 && <StateMessage title={empty} body="A agenda muda conforme a previsao das ordens de servico." compact />}
+      <div className="bordo-list-grid">
+        {items.map((os) => <AgendaCard key={os.id} os={os} muted={muted} />)}
+      </div>
+    </section>
+  );
+}
+
+function AgendaCard({ os, muted }) {
+  return (
+    <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10, opacity: muted ? 0.7 : 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+        <div>
+          <div style={{ fontSize: 14, color: C.white, fontWeight: 800 }}>{os.codigo}</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{dateKey(os.previsao)} · {os.embarcacao}</div>
+        </div>
+        <StatusBadge status={os.status} />
+      </div>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.62)", marginBottom: 8 }}>
+        {os.cliente || "Cliente nao informado"} · {os.responsavel || "Sem responsavel"}
+      </div>
+      {os.descricao && <p style={{ color: "rgba(255,255,255,0.58)", fontSize: 12, marginBottom: 8 }}>{os.descricao}</p>}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <span style={tagStyle}>{os.tipo || "Servico"}</span>
+        <span style={tagStyle}>{os.prioridade || "normal"}</span>
+      </div>
+    </div>
   );
 }
 

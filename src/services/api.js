@@ -180,4 +180,8 @@ export const api = {
   dashboard: {
     dados: () => request("/dashboard"),
   },
+
+  agenda: {
+    listar: () => request("/agenda"),
+  },
 };

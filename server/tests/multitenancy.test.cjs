@@ -132,6 +132,7 @@ test("isola dados entre empresas e aplica permissoes", async () => {
       cliente_id: createdClient.body.id,
       embarcacao_id: createdBoat.body.id,
       tipo: "Revisao",
+      previsao: "2026-07-02",
       tarefas: ["Avaliar motor", "Testar navegacao"],
     }),
   }, first.body.token);
@@ -141,6 +142,15 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   assert.equal(createdOrder.body.embarcacao, "Lancha Privada");
   assert.equal(createdOrder.body.cliente_id, createdClient.body.id);
   assert.equal(createdOrder.body.embarcacao_id, createdBoat.body.id);
+
+  const firstAgenda = await request("/agenda", {}, first.body.token);
+  const secondAgenda = await request("/agenda", {}, second.body.token);
+  assert.equal(firstAgenda.status, 200);
+  assert.equal(secondAgenda.status, 200);
+  assert.equal(firstAgenda.body.length, 1);
+  assert.equal(firstAgenda.body[0].codigo, createdOrder.body.codigo);
+  assert.equal(firstAgenda.body[0].previsao, "2026-07-02");
+  assert.equal(secondAgenda.body.length, 0);
 
   const clientHistory = await request(`/clientes/${createdClient.body.id}/historico`, {}, first.body.token);
   assert.equal(clientHistory.status, 200);

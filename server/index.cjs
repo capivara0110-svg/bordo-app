@@ -20,6 +20,7 @@ app.use("/api/estoque", require("./routes/estoque.cjs"));
 app.use("/api/clientes", require("./routes/clientes.cjs"));
 app.use("/api/embarcacoes", require("./routes/embarcacoes.cjs"));
 app.use("/api/ordens", require("./routes/ordens.cjs"));
+app.use("/api/agenda", require("./routes/agenda.cjs"));
 app.use("/api/notificacoes", require("./routes/notificacoes.cjs"));
 app.use("/api/bercos", require("./routes/bercos.cjs"));
 app.use("/api/dashboard", require("./routes/dashboard.cjs"));
