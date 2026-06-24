@@ -14,9 +14,11 @@ const allowedPriorities = ["baixa", "media", "normal", "alta", "urgente"];
 const allowedPhotoCategories = ["geral", "antes", "durante", "depois", "documento"];
 
 async function getOrder(id, empresaId) {
+  const orderId = Number(id);
+  if (!Number.isInteger(orderId) || orderId <= 0) return null;
   const order = await db.prepare(
     "SELECT * FROM ordens_servico WHERE id = ? AND empresa_id = ?",
-  ).get(id, empresaId);
+  ).get(orderId, empresaId);
   if (!order) return null;
 
   const tarefas = await db.prepare(
@@ -26,11 +28,13 @@ async function getOrder(id, empresaId) {
 }
 
 async function getOrderPhotos(id, empresaId) {
+  const orderId = Number(id);
+  if (!Number.isInteger(orderId) || orderId <= 0) return [];
   return db.prepare(
     `SELECT * FROM fotos
      WHERE tipo = 'ordem' AND referencia_id = ? AND empresa_id = ?
      ORDER BY criado_em DESC, id DESC`,
-  ).all(id, empresaId);
+  ).all(orderId, empresaId);
 }
 
 function cleanTaskList(value) {

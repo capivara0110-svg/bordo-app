@@ -30,12 +30,14 @@ function cleanPhotoPayload(body) {
 }
 
 async function getEmbarcacao(id, empresaId) {
+  const embarcacaoId = Number(id);
+  if (!Number.isInteger(embarcacaoId) || embarcacaoId <= 0) return null;
   return db.prepare(
     `SELECT e.*, c.nome AS cliente_nome
      FROM embarcacoes e
      LEFT JOIN clientes c ON c.id = e.cliente_id AND c.empresa_id = e.empresa_id
      WHERE e.id = ? AND e.empresa_id = ?`,
-  ).get(id, empresaId);
+  ).get(embarcacaoId, empresaId);
 }
 
 async function validClientId(value, empresaId) {
