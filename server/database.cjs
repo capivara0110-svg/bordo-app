@@ -183,6 +183,10 @@ async function migrateTenantColumns() {
   await addColumn("tripulacao", "telefone TEXT DEFAULT ''");
   await addColumn("tripulacao", "disponibilidade TEXT DEFAULT 'disponivel'");
   await addColumn("tripulacao", "observacao TEXT DEFAULT ''");
+  await run("UPDATE tripulacao SET funcao = cargo WHERE funcao IS NULL OR funcao = ''");
+  await run("UPDATE tripulacao SET telefone = '' WHERE telefone IS NULL");
+  await run("UPDATE tripulacao SET disponibilidade = 'disponivel' WHERE disponibilidade IS NULL OR disponibilidade = ''");
+  await run("UPDATE tripulacao SET observacao = '' WHERE observacao IS NULL");
 
   let empresa = await get("SELECT id FROM empresas ORDER BY id LIMIT 1");
   if (!empresa) {
