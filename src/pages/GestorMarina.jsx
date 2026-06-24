@@ -13,6 +13,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [equipe, setEquipe] = useState([]);
   const [bercos, setBercos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const tabs = [
     { id: "dashboard", icon: "📊", label: "Painel" },
@@ -24,6 +25,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
+      setError("");
       try {
         const [dash, ord, trip, ber] = await Promise.all([
           api.dashboard.dados(),
@@ -37,6 +39,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
         setBercos(ber);
       } catch (err) {
         console.error("Erro ao carregar dashboard:", err);
+        setError(err.message || "Nao foi possivel carregar o painel");
       }
       setLoading(false);
     }
@@ -45,13 +48,14 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
 
   const renderTab = () => {
     if (loading) return <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Carregando...</div>;
+    if (error) return <StateMessage title="Nao foi possivel carregar o painel" body={error} />;
 
     switch (tab) {
       case "dashboard":
-        if (!dashboard) return null;
+        if (!dashboard) return <StateMessage title="Painel vazio" body="Ainda nao existem dados suficientes para montar o dashboard." />;
         return (
-          <div style={{ padding: "16px 16px 24px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+          <div className="bordo-page-body">
+            <div className="bordo-card-grid">
               {[
                 { label: "OS Ativas", value: dashboard.os.ativas, icon: "🔧", color: C.gold },
                 { label: "Berços Ocupados", value: dashboard.bercos.ocupados + "/" + dashboard.bercos.total, icon: "⚓", color: C.aqua },
@@ -74,7 +78,10 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
               </div>
             )}
 
-            <div>
+            <div className="bordo-list-grid">
+              {dashboard.ultimasOS.length === 0 && <StateMessage title="Nenhuma ordem recente" body="Quando uma OS for criada, ela aparece aqui." compact />}
+              {dashboard.ultimasOS.length > 0 && (
+              <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.white, marginBottom: 10 }}>📋 Últimas Ordens</div>
               {dashboard.ultimasOS.map(os => (
                 <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12, marginBottom: 8 }}>
@@ -85,17 +92,20 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{os.embarcacao} · {os.responsavel || "—"}</div>
                 </div>
               ))}
+              </div>
+              )}
             </div>
           </div>
         );
 
       case "equipe":
         return (
-          <div style={{ padding: "12px 16px" }}>
+          <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Tripulação</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{equipe.length} membros</div>
             </div>
+            <div className="bordo-list-grid">
             {equipe.map(m => (
               <div key={m.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -108,16 +118,18 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         );
 
       case "ordens":
         return (
-          <div style={{ padding: "12px 16px" }}>
+          <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Ordens</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{ordens.length} ordens</div>
             </div>
+            <div className="bordo-list-grid">
             {ordens.map(os => (
               <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -135,16 +147,18 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         );
 
       case "bercos":
         return (
-          <div style={{ padding: "12px 16px" }}>
+          <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Berços</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{bercos.length} vagas</div>
             </div>
+            <div className="bordo-list-grid">
             {bercos.map(b => (
               <div key={b.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -169,17 +183,21 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         );
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.ocean, paddingBottom: 80, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div className="bordo-app-screen" style={{ minHeight: "100vh", background: C.ocean, paddingBottom: 80, maxWidth: 480, margin: "0 auto", position: "relative" }}>
       <Header title={profile.company?.name || "Minha empresa"} sub="Painel do Gestor" color={C.green} />
+      <div className="bordo-desktop-only" style={{ color: "rgba(255,255,255,0.44)", fontSize: 14, margin: "-8px 0 20px" }}>
+        Visao geral da operacao, equipe, ordens de servico e ocupacao da marina.
+      </div>
       {renderTab()}
 
-      <div style={{
+      <div className="bordo-bottom-nav" style={{
         position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
         maxWidth: 480, width: "100%",
         background: "rgba(10,37,64,0.95)", backdropFilter: "blur(12px)",
@@ -213,6 +231,22 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
           <span style={{ fontSize: 10, fontWeight: 700, color: C.white }}>Sair</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+function StateMessage({ title, body, compact = false }) {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.05)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: 16,
+      padding: compact ? 16 : 28,
+      color: C.white,
+      margin: compact ? 0 : 16,
+    }}>
+      <div style={{ fontFamily: fonts.display, fontWeight: 800, fontSize: compact ? 16 : 20 }}>{title}</div>
+      <div style={{ color: "rgba(255,255,255,0.45)", marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>{body}</div>
     </div>
   );
 }

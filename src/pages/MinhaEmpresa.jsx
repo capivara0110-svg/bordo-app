@@ -101,10 +101,10 @@ export default function MinhaEmpresa({ profile, onBack }) {
   };
 
   return (
-    <main style={{ minHeight: "100vh", background: C.ocean, maxWidth: 720, margin: "0 auto", paddingBottom: 32 }}>
+    <main className="bordo-app-screen bordo-no-sidebar" style={{ minHeight: "100vh", background: C.ocean, maxWidth: 720, margin: "0 auto", paddingBottom: 32 }}>
       <Header title="Minha Empresa" sub="Equipe, plano e permissoes" onBack={onBack} color={C.green} />
 
-      <div style={{ padding: "8px 16px 24px" }}>
+      <div className="bordo-page-body" style={{ padding: "8px 16px 24px" }}>
         {loading && <StateMessage>Carregando empresa...</StateMessage>}
         {error && <Alert tone="error">{error}</Alert>}
         {message && <Alert tone="success">{message}</Alert>}

@@ -88,7 +88,7 @@ export default function NauticoPro({ profile, onLogout }) {
   };
 
   const UserBar = () => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+    <div className="bordo-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 22 }}>{fullProfile.emoji}</span>
         <div>
@@ -121,7 +121,7 @@ export default function NauticoPro({ profile, onLogout }) {
     switch (tab) {
       case "diario":
         return (
-          <div style={{ padding: "12px 16px" }}>
+          <div className="bordo-page-body">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
                 <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Registros</div>
@@ -130,6 +130,7 @@ export default function NauticoPro({ profile, onLogout }) {
               <button onClick={() => setShowModal("diario")} style={{ background: C.aqua, border: "none", borderRadius: 10, padding: "10px 16px", color: C.white, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+ Novo</button>
             </div>
             {diario.length === 0 && <div style={{ textAlign: "center", color: "rgba(255,255,255,0.2)", padding: 40 }}>Nenhum registro ainda</div>}
+            <div className="bordo-list-grid">
             {diario.map(r => (
               <div key={r.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -148,6 +149,7 @@ export default function NauticoPro({ profile, onLogout }) {
                 </div>
               </div>
             ))}
+            </div>
             {showModal === "diario" && (
               <Modal>
                 <div style={{ fontSize: 16, fontWeight: 700, color: C.white, marginBottom: 16 }}>📋 Novo Registro</div>
@@ -169,7 +171,7 @@ export default function NauticoPro({ profile, onLogout }) {
 
       case "checklist":
         return (
-          <div style={{ padding: "12px 16px" }}>
+          <div className="bordo-page-body">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
                 <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Segurança</div>
@@ -225,11 +227,12 @@ export default function NauticoPro({ profile, onLogout }) {
 
       case "tripulacao":
         return (
-          <div style={{ padding: "12px 16px" }}>
+          <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Tripulação</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{tripulacao.length} membros</div>
             </div>
+            <div className="bordo-list-grid">
             {tripulacao.map(m => (
               <div key={m.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
@@ -246,16 +249,18 @@ export default function NauticoPro({ profile, onLogout }) {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         );
 
       case "estoque":
         return (
-          <div style={{ padding: "12px 16px" }}>
+          <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Estoque</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{estoque.length} itens</div>
             </div>
+            <div className="bordo-list-grid">
             {estoque.map(item => {
               const baixo = item.quantidade < item.minimo;
               return (
@@ -276,16 +281,18 @@ export default function NauticoPro({ profile, onLogout }) {
                 </div>
               );
             })}
+            </div>
           </div>
         );
 
       case "ordens":
         return (
-          <div style={{ padding: "12px 16px" }}>
+          <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Ordens</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{ordens.length} ordens</div>
             </div>
+            <div className="bordo-list-grid">
             {ordens.map(os => (
               <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -303,6 +310,7 @@ export default function NauticoPro({ profile, onLogout }) {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         );
 
@@ -312,12 +320,12 @@ export default function NauticoPro({ profile, onLogout }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.ocean, paddingBottom: 80, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div className="bordo-app-screen" style={{ minHeight: "100vh", background: C.ocean, paddingBottom: 80, maxWidth: 480, margin: "0 auto", position: "relative" }}>
       <UserBar />
       {renderTab()}
 
       {/* Tab bar inferior */}
-      <div style={{
+      <div className="bordo-bottom-nav" style={{
         position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
         maxWidth: 480, width: "100%",
         background: "rgba(10,37,64,0.95)", backdropFilter: "blur(12px)",

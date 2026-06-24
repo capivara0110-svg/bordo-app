@@ -101,9 +101,65 @@ export default function App() {
     <div>
       <style>{`
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: ${fonts.body}; background: ${C.sand}; }
+        html { background: ${C.ocean}; }
+        body { font-family: ${fonts.body}; background: ${C.ocean}; min-height: 100vh; }
+        #root { min-height: 100vh; background: ${C.ocean}; }
         input:focus { border-color: ${C.aqua} !important; box-shadow: 0 0 0 3px rgba(23,168,189,0.15); }
         button:active { opacity: 0.85; }
+        .bordo-page-body { padding: 16px 16px 24px; }
+        .bordo-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .bordo-list-grid > * { min-width: 0; }
+        .bordo-desktop-only { display: none; }
+
+        @media (min-width: 900px) {
+          body { background: radial-gradient(circle at top left, rgba(23,168,189,0.18), transparent 34%), ${C.ocean}; }
+          .bordo-app-screen {
+            width: min(1180px, calc(100vw - 48px)) !important;
+            max-width: none !important;
+            margin: 0 auto !important;
+            padding: 24px 24px 40px 120px !important;
+          }
+          .bordo-no-sidebar {
+            padding-left: 24px !important;
+          }
+          .bordo-header {
+            position: static !important;
+            border-radius: 24px !important;
+            margin-bottom: 18px !important;
+            padding: 24px 28px !important;
+            background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.035)) !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+          }
+          .bordo-page-body { padding: 0 !important; }
+          .bordo-card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 14px !important; }
+          .bordo-list-grid {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)) !important;
+            gap: 14px !important;
+          }
+          .bordo-list-grid > * { margin-bottom: 0 !important; }
+          .bordo-bottom-nav {
+            top: 24px !important;
+            bottom: auto !important;
+            left: max(24px, calc((100vw - 1180px) / 2 + 24px)) !important;
+            transform: none !important;
+            width: 80px !important;
+            max-width: none !important;
+            height: auto !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+            border-radius: 24px !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+            padding: 14px 8px !important;
+            box-shadow: 0 18px 60px rgba(0,0,0,0.18);
+          }
+          .bordo-bottom-nav button {
+            width: 100% !important;
+            padding: 10px 6px !important;
+            border-radius: 16px !important;
+          }
+          .bordo-desktop-only { display: block; }
+        }
       `}</style>
 
       {screen === "landing" && <Landing onStart={() => navigate("login")} />}

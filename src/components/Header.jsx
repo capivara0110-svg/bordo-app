@@ -2,7 +2,7 @@
 
 export default function Header({ title, sub, onBack, color = C.aqua }) {
   return (
-    <div style={{ background: C.ocean, padding: "20px 20px 16px", position: "sticky", top: 0, zIndex: 50 }}>
+    <div className="bordo-header" style={{ background: C.ocean, padding: "20px 20px 16px", position: "sticky", top: 0, zIndex: 50 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {onBack && (
           <button onClick={onBack} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", color: C.white, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>
