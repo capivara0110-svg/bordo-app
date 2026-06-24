@@ -85,10 +85,15 @@ export const api = {
   // ─── TRIPULAÇÃO ───────────────────────────────────────
   tripulacao: {
     listar: () => request("/tripulacao"),
-    criar: (nome, cargo, habilitacao, certificado) =>
+    criar: (dados) =>
       request("/tripulacao", {
         method: "POST",
-        body: JSON.stringify({ nome, cargo, habilitacao, certificado }),
+        body: JSON.stringify(dados),
+      }),
+    editar: (id, dados) =>
+      request(`/tripulacao/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(dados),
       }),
   },
 

@@ -38,6 +38,17 @@ const emptyBoat = {
   observacao: "",
 };
 
+const emptyTeamMember = {
+  nome: "",
+  funcao: "Marinharia",
+  cargo: "Marinharia",
+  telefone: "",
+  disponibilidade: "disponivel",
+  habilitacao: "",
+  certificado: "",
+  observacao: "",
+};
+
 const statusOptions = [
   ["todos", "Todos"],
   ["aguardando", "Aguardando"],
@@ -52,6 +63,25 @@ const priorityOptions = [
   ["normal", "Normal"],
   ["alta", "Alta"],
   ["urgente", "Urgente"],
+];
+
+const functionOptions = [
+  "Limpeza",
+  "Marinharia",
+  "Marinheiro",
+  "Mecanico",
+  "Eletrica",
+  "Fibra",
+  "Pintura",
+  "Polimento",
+  "Coordenacao",
+];
+
+const availabilityOptions = [
+  ["disponivel", "Disponivel"],
+  ["ocupado", "Ocupado"],
+  ["folga", "Folga"],
+  ["indisponivel", "Indisponivel"],
 ];
 
 const photoCategories = [
@@ -93,10 +123,14 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [newTask, setNewTask] = useState({});
   const [clientForm, setClientForm] = useState(emptyClient);
   const [boatForm, setBoatForm] = useState(emptyBoat);
+  const [teamForm, setTeamForm] = useState(emptyTeamMember);
   const [editingClientId, setEditingClientId] = useState(null);
   const [editingBoatId, setEditingBoatId] = useState(null);
+  const [editingTeamId, setEditingTeamId] = useState(null);
   const [clientMessage, setClientMessage] = useState("");
   const [boatMessage, setBoatMessage] = useState("");
+  const [teamMessage, setTeamMessage] = useState("");
+  const [agendaResponsavel, setAgendaResponsavel] = useState("todos");
   const [clientHistory, setClientHistory] = useState(null);
   const [boatHistory, setBoatHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState("");
@@ -454,6 +488,56 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     }
   };
 
+  const updateTeamForm = (field, value) => {
+    setTeamForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "funcao" ? { cargo: value } : {}),
+    }));
+    setTeamMessage("");
+  };
+
+  const clearTeamForm = () => {
+    setTeamForm(emptyTeamMember);
+    setEditingTeamId(null);
+  };
+
+  const editTeamMember = (member) => {
+    setTeamForm({
+      nome: member.nome || "",
+      funcao: member.funcao || member.cargo || "Marinharia",
+      cargo: member.cargo || member.funcao || "Marinharia",
+      telefone: member.telefone || "",
+      disponibilidade: member.disponibilidade || "disponivel",
+      habilitacao: member.habilitacao || "",
+      certificado: member.certificado || "",
+      observacao: member.observacao || "",
+    });
+    setEditingTeamId(member.id);
+    setTeamMessage("");
+  };
+
+  const saveTeamMember = async (event) => {
+    event.preventDefault();
+    setTeamMessage("");
+    try {
+      const saved = editingTeamId
+        ? await api.tripulacao.editar(editingTeamId, teamForm)
+        : await api.tripulacao.criar(teamForm);
+      setEquipe((current) => {
+        const exists = current.some((item) => item.id === saved.id);
+        const next = exists
+          ? current.map((item) => (item.id === saved.id ? saved : item))
+          : [...current, saved];
+        return next.sort((a, b) => a.nome.localeCompare(b.nome));
+      });
+      setTeamMessage(editingTeamId ? "Prestador atualizado com sucesso." : "Prestador cadastrado com sucesso.");
+      clearTeamForm();
+    } catch (err) {
+      setTeamMessage(err.message || "Nao foi possivel salvar o prestador");
+    }
+  };
+
   const renderTab = () => {
     if (loading) return <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Carregando...</div>;
     if (error) return <StateMessage title="Nao foi possivel carregar o painel" body={error} />;
@@ -508,19 +592,31 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
 
       case "agenda": {
         const hoje = todayKey();
-        const atrasadas = agenda.filter((os) => dateKey(os.previsao) < hoje && os.status !== "concluida");
-        const hojeAgenda = agenda.filter((os) => dateKey(os.previsao) === hoje && os.status !== "concluida");
-        const proximas = agenda.filter((os) => dateKey(os.previsao) > hoje && os.status !== "concluida");
-        const concluidas = agenda.filter((os) => os.status === "concluida");
+        const agendaFiltrada = agendaResponsavel === "todos"
+          ? agenda
+          : agenda.filter((os) => os.responsavel === agendaResponsavel);
+        const atrasadas = agendaFiltrada.filter((os) => dateKey(os.previsao) < hoje && os.status !== "concluida");
+        const hojeAgenda = agendaFiltrada.filter((os) => dateKey(os.previsao) === hoje && os.status !== "concluida");
+        const proximas = agendaFiltrada.filter((os) => dateKey(os.previsao) > hoje && os.status !== "concluida");
+        const concluidas = agendaFiltrada.filter((os) => os.status === "concluida");
 
         return (
           <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Agenda</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{agenda.length} servicos com previsao</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{agendaFiltrada.length} servicos com previsao</div>
               <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 4 }}>
                 Planejamento da oficina/marina baseado na previsao da OS.
               </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <Field label="Filtrar por responsavel">
+                <select value={agendaResponsavel} onChange={(event) => setAgendaResponsavel(event.target.value)} style={inputStyle}>
+                  <option value="todos">Todos os responsaveis</option>
+                  {equipe.map((member) => <option key={member.id} value={member.nome}>{member.nome} - {member.funcao || member.cargo}</option>)}
+                </select>
+              </Field>
             </div>
 
             <div className="bordo-card-grid">
@@ -727,19 +823,72 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
         return (
           <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Tripulação</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{equipe.length} membros</div>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Equipe operacional</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{equipe.length} prestadores</div>
+              <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 4 }}>
+                Cadastre limpeza, marinharia, marinheiro, mecanica, eletrica e outros responsaveis por OS.
+              </div>
             </div>
+
+            {teamMessage && <InlineMessage tone={teamMessage.includes("sucesso") ? "success" : "error"}>{teamMessage}</InlineMessage>}
+
+            <form onSubmit={saveTeamMember} style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>
+                    {editingTeamId ? "Editar prestador" : "Novo prestador"}
+                  </div>
+                  <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 3 }}>
+                    Função e disponibilidade ajudam a organizar agenda e OS.
+                  </div>
+                </div>
+                {editingTeamId && <button type="button" onClick={clearTeamForm} style={ghostButton}>Cancelar</button>}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                <Field label="Nome">
+                  <input required value={teamForm.nome} onChange={(event) => updateTeamForm("nome", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Funcao">
+                  <select value={teamForm.funcao} onChange={(event) => updateTeamForm("funcao", event.target.value)} style={inputStyle}>
+                    {functionOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </Field>
+                <Field label="Disponibilidade">
+                  <select value={teamForm.disponibilidade} onChange={(event) => updateTeamForm("disponibilidade", event.target.value)} style={inputStyle}>
+                    {availabilityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </Field>
+                <Field label="Telefone">
+                  <input value={teamForm.telefone} onChange={(event) => updateTeamForm("telefone", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Habilitacao">
+                  <input value={teamForm.habilitacao} onChange={(event) => updateTeamForm("habilitacao", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Certificado">
+                  <input value={teamForm.certificado} onChange={(event) => updateTeamForm("certificado", event.target.value)} style={inputStyle} />
+                </Field>
+              </div>
+              <Field label="Observacao">
+                <textarea value={teamForm.observacao} onChange={(event) => updateTeamForm("observacao", event.target.value)} style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
+              </Field>
+              <button type="submit" style={primarySmallButton}>{editingTeamId ? "Salvar prestador" : "Cadastrar prestador"}</button>
+            </form>
+
             <div className="bordo-list-grid">
+            {equipe.length === 0 && <StateMessage title="Nenhum prestador cadastrado" body="Cadastre a equipe para organizar agenda e responsaveis por OS." compact />}
             {equipe.map(m => (
               <div key={m.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 28 }}>{m.avatar || "👤"}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{m.nome}</div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{m.cargo}</div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{m.funcao || m.cargo} · {m.telefone || "sem telefone"}</div>
+                    {m.observacao && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.36)", marginTop: 4 }}>{m.observacao}</div>}
                   </div>
-                  <StatusBadge status={m.status || "ok"} />
+                  <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+                    <StatusBadge status={m.status || m.disponibilidade || "ok"} />
+                    <button type="button" onClick={() => editTeamMember(m)} style={ghostButton}>Editar</button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -825,7 +974,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     <input value={orderForm.tipo} onChange={(event) => updateOrderForm("tipo", event.target.value)} style={inputStyle} />
                   </Field>
                   <Field label="Responsavel">
-                    <input value={orderForm.responsavel} onChange={(event) => updateOrderForm("responsavel", event.target.value)} style={inputStyle} />
+                    <input list="responsaveis-equipe" value={orderForm.responsavel} onChange={(event) => updateOrderForm("responsavel", event.target.value)} style={inputStyle} />
                   </Field>
                   <Field label="Previsao">
                     <input value={orderForm.previsao} onChange={(event) => updateOrderForm("previsao", event.target.value)} style={inputStyle} placeholder="Ex.: 28/06/2026" />
@@ -843,6 +992,9 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     </Field>
                   )}
                 </div>
+                <datalist id="responsaveis-equipe">
+                  {equipe.map((member) => <option key={member.id} value={member.nome}>{member.funcao || member.cargo}</option>)}
+                </datalist>
                 <Field label="Descricao do servico">
                   <textarea value={orderForm.descricao} onChange={(event) => updateOrderForm("descricao", event.target.value)} style={{ ...inputStyle, minHeight: 86, resize: "vertical" }} />
                 </Field>

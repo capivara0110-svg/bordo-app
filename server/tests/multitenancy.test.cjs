@@ -98,6 +98,36 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   assert.equal(firstCompany.body.assinatura.plano, "trial");
   assert.equal(firstCompany.body.assinatura.limites.usuarios, 3);
 
+  const prestador = await request("/tripulacao", {
+    method: "POST",
+    body: JSON.stringify({
+      nome: "Tecnico Um",
+      funcao: "Mecanico",
+      telefone: "11988887777",
+      disponibilidade: "disponivel",
+      observacao: "Atende motores diesel",
+    }),
+  }, first.body.token);
+  assert.equal(prestador.status, 201);
+  assert.equal(prestador.body.funcao, "Mecanico");
+  assert.equal(prestador.body.disponibilidade, "disponivel");
+
+  const prestadorEditado = await request(`/tripulacao/${prestador.body.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      nome: "Tecnico Um",
+      funcao: "Mecanico",
+      telefone: "11988887777",
+      disponibilidade: "ocupado",
+      observacao: "Alocado em OS critica",
+    }),
+  }, first.body.token);
+  assert.equal(prestadorEditado.status, 200);
+  assert.equal(prestadorEditado.body.disponibilidade, "ocupado");
+
+  const secondTeam = await request("/tripulacao", {}, second.body.token);
+  assert.equal(secondTeam.body.some((item) => item.id === prestador.body.id), false);
+
   const createdClient = await request("/clientes", {
     method: "POST",
     body: JSON.stringify({

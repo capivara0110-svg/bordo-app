@@ -7,6 +7,8 @@ const map = {
   ativo: { bg: "#d4edda", color: "#155724", label: "Ativo" },
   em_viagem: { bg: "#E8F4F8", color: "#1B4F72", label: "Em viagem" },
   folga: { bg: "#f0f0f0", color: "#6B7B8D", label: "Folga" },
+  disponivel: { bg: "#d4edda", color: "#155724", label: "Disponivel" },
+  indisponivel: { bg: "#f8d7da", color: "#721c24", label: "Indisponivel" },
   ocupado: { bg: "#fff3cd", color: "#856404", label: "Ocupado" },
   livre: { bg: "#d4edda", color: "#155724", label: "Livre" },
   reservado: { bg: "#E8F4F8", color: "#1B4F72", label: "Reservado" },

@@ -107,7 +107,9 @@ async function createSchema() {
     `CREATE TABLE IF NOT EXISTS tripulacao (
       id ${id}, empresa_id INTEGER, nome TEXT NOT NULL, cargo TEXT NOT NULL,
       habilitacao TEXT DEFAULT '', certificado TEXT DEFAULT '', status TEXT DEFAULT 'ok',
-      avatar TEXT DEFAULT '', criado_em TIMESTAMP DEFAULT ${now}
+      avatar TEXT DEFAULT '', funcao TEXT DEFAULT '', telefone TEXT DEFAULT '',
+      disponibilidade TEXT DEFAULT 'disponivel', observacao TEXT DEFAULT '',
+      criado_em TIMESTAMP DEFAULT ${now}
     )`,
     `CREATE TABLE IF NOT EXISTS estoque (
       id ${id}, empresa_id INTEGER, nome TEXT NOT NULL, unidade TEXT DEFAULT 'un',
@@ -177,6 +179,10 @@ async function migrateTenantColumns() {
   }
   await addColumn("ordens_servico", "cliente_id INTEGER");
   await addColumn("ordens_servico", "embarcacao_id INTEGER");
+  await addColumn("tripulacao", "funcao TEXT DEFAULT ''");
+  await addColumn("tripulacao", "telefone TEXT DEFAULT ''");
+  await addColumn("tripulacao", "disponibilidade TEXT DEFAULT 'disponivel'");
+  await addColumn("tripulacao", "observacao TEXT DEFAULT ''");
 
   let empresa = await get("SELECT id FROM empresas ORDER BY id LIMIT 1");
   if (!empresa) {

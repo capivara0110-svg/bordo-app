@@ -76,10 +76,10 @@ Nota tecnica importante:
 
 ### Fase 2 - Prestadores e equipe operacional
 
-- [ ] Cadastro de funcoes operacionais: limpeza, marinharia, marinheiro, mecanico, eletrica, fibra, pintura, polimento
-- [ ] Disponibilidade da equipe
+- [x] Cadastro de funcoes operacionais: limpeza, marinharia, marinheiro, mecanico, eletrica, fibra, pintura, polimento
+- [x] Disponibilidade da equipe
 - [ ] Responsavel principal e auxiliares na OS
-- [ ] Filtro de agenda por prestador/responsavel
+- [x] Filtro de agenda por prestador/responsavel
 - [ ] Visao do prestador com apenas suas OS e tarefas
 
 ### Fase 3 - Orcamento e execucao financeira
