@@ -66,6 +66,14 @@ Publico principal:
 - [x] Tipo de foto: antes, durante, depois, documento ou geral
 - [ ] Preparar armazenamento externo para producao
 
+Nota tecnica importante:
+
+- Hoje as fotos do MVP podem ser salvas como data URL no banco para validar fluxo rapido.
+- Antes de vender em producao, migrar fotos para armazenamento externo.
+- Opcoes candidatas: S3 compativel, Cloudinary, Railway Volume ou outro storage com URL publica/assinada.
+- O banco deve guardar metadados e URL da foto, nao o arquivo pesado definitivo.
+- Essa migracao precisa acontecer antes de uso real com muitos clientes, para evitar banco pesado, backup lento e custo ruim.
+
 ### Fase 2 - Prestadores e equipe operacional
 
 - [ ] Cadastro de funcoes operacionais: limpeza, marinharia, marinheiro, mecanico, eletrica, fibra, pintura, polimento
