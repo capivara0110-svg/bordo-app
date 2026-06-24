@@ -13,7 +13,9 @@ const emptyOrder = {
   prioridade: "normal",
   status: "aguardando",
   descricao: "",
+  responsavel_id: "",
   responsavel: "",
+  auxiliares: [],
   previsao: "",
   observacao: "",
   tarefas: "",
@@ -121,6 +123,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [orderFilter, setOrderFilter] = useState("todos");
   const [orderSearch, setOrderSearch] = useState("");
   const [newTask, setNewTask] = useState({});
+  const [executionDraft, setExecutionDraft] = useState({});
   const [clientForm, setClientForm] = useState(emptyClient);
   const [boatForm, setBoatForm] = useState(emptyBoat);
   const [teamForm, setTeamForm] = useState(emptyTeamMember);
@@ -286,6 +289,30 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     setOrderMessage("");
   };
 
+  const selectOrderResponsible = (id) => {
+    const member = equipe.find((item) => String(item.id) === String(id));
+    setOrderForm((current) => ({
+      ...current,
+      responsavel_id: id,
+      responsavel: member?.nome || current.responsavel,
+    }));
+    setOrderMessage("");
+  };
+
+  const toggleOrderAuxiliar = (id) => {
+    setOrderForm((current) => {
+      const value = Number(id);
+      const currentIds = current.auxiliares || [];
+      return {
+        ...current,
+        auxiliares: currentIds.includes(value)
+          ? currentIds.filter((item) => item !== value)
+          : [...currentIds, value],
+      };
+    });
+    setOrderMessage("");
+  };
+
   const startNewOrder = () => {
     setOrderForm(emptyOrder);
     setEditingOrderId(null);
@@ -303,7 +330,9 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       prioridade: order.prioridade || "normal",
       status: order.status || "aguardando",
       descricao: order.descricao || "",
+      responsavel_id: order.responsavel_id || "",
       responsavel: order.responsavel || "",
+      auxiliares: (order.auxiliares || []).map((item) => Number(item.membro_id)),
       previsao: order.previsao || "",
       observacao: order.observacao || "",
       tarefas: "",
@@ -372,6 +401,42 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       setOrdens((current) => current.map((item) => (item.id === orderId ? updated : item)));
     } catch (err) {
       setOrderMessage(err.message || "Nao foi possivel atualizar a tarefa");
+    }
+  };
+
+  const updateExecutionDraft = (orderId, field, value) => {
+    setExecutionDraft((current) => ({
+      ...current,
+      [orderId]: {
+        membro_id: "",
+        descricao: "",
+        ...(current[orderId] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const saveExecution = async (orderId) => {
+    const draft = executionDraft[orderId] || {};
+    const descricao = String(draft.descricao || "").trim();
+    if (!descricao) {
+      setOrderMessage("Descreva o que foi feito antes de registrar.");
+      return;
+    }
+    try {
+      const saved = await api.ordens.registrarExecucao(orderId, {
+        membro_id: draft.membro_id,
+        descricao,
+      });
+      setOrdens((current) => current.map((item) => (
+        item.id === orderId
+          ? { ...item, execucoes: [saved, ...(item.execucoes || [])] }
+          : item
+      )));
+      setExecutionDraft((current) => ({ ...current, [orderId]: { membro_id: "", descricao: "" } }));
+      setOrderMessage("Execucao registrada com sucesso.");
+    } catch (err) {
+      setOrderMessage(err.message || "Nao foi possivel registrar a execucao");
     }
   };
 
@@ -974,8 +1039,16 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     <input value={orderForm.tipo} onChange={(event) => updateOrderForm("tipo", event.target.value)} style={inputStyle} />
                   </Field>
                   <Field label="Responsavel">
-                    <input list="responsaveis-equipe" value={orderForm.responsavel} onChange={(event) => updateOrderForm("responsavel", event.target.value)} style={inputStyle} />
+                    <select value={orderForm.responsavel_id} onChange={(event) => selectOrderResponsible(event.target.value)} style={inputStyle}>
+                      <option value="">Digitar manualmente</option>
+                      {equipe.map((member) => <option key={member.id} value={member.id}>{member.nome} - {member.funcao || member.cargo}</option>)}
+                    </select>
                   </Field>
+                  {!orderForm.responsavel_id && (
+                    <Field label="Responsavel manual">
+                      <input value={orderForm.responsavel} onChange={(event) => updateOrderForm("responsavel", event.target.value)} style={inputStyle} />
+                    </Field>
+                  )}
                   <Field label="Previsao">
                     <input value={orderForm.previsao} onChange={(event) => updateOrderForm("previsao", event.target.value)} style={inputStyle} placeholder="Ex.: 28/06/2026" />
                   </Field>
@@ -992,9 +1065,21 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     </Field>
                   )}
                 </div>
-                <datalist id="responsaveis-equipe">
-                  {equipe.map((member) => <option key={member.id} value={member.nome}>{member.funcao || member.cargo}</option>)}
-                </datalist>
+                <Field label="Auxiliares">
+                  <div style={{ ...panelStyle, padding: 10, display: "grid", gap: 8 }}>
+                    {equipe.length === 0 && <span style={{ color: "rgba(255,255,255,0.42)", fontSize: 12 }}>Cadastre a equipe para selecionar auxiliares.</span>}
+                    {equipe.map((member) => (
+                      <label key={member.id} style={{ display: "flex", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.70)", fontSize: 12 }}>
+                        <input
+                          type="checkbox"
+                          checked={(orderForm.auxiliares || []).includes(Number(member.id))}
+                          onChange={() => toggleOrderAuxiliar(member.id)}
+                        />
+                        {member.nome} · {member.funcao || member.cargo}
+                      </label>
+                    ))}
+                  </div>
+                </Field>
                 <Field label="Descricao do servico">
                   <textarea value={orderForm.descricao} onChange={(event) => updateOrderForm("descricao", event.target.value)} style={{ ...inputStyle, minHeight: 86, resize: "vertical" }} />
                 </Field>
@@ -1026,6 +1111,16 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: os.prioridade === "urgente" ? C.rust : "rgba(255,255,255,0.5)" }}>{os.prioridade}</span>
                   <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.responsavel || "—"}</span>
                 </div>
+                {(os.auxiliares || []).length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 11, fontWeight: 700, marginBottom: 5 }}>Auxiliares</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {(os.auxiliares || []).map((auxiliar) => (
+                        <span key={auxiliar.id} style={tagStyle}>{auxiliar.nome} · {auxiliar.funcao || "Equipe"}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, marginTop: 12, alignItems: "center" }}>
                   <select value={os.status} onChange={(event) => updateOrderStatus(os.id, event.target.value)} style={inputStyle}>
                     {statusOptions.filter(([value]) => value !== "todos").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -1063,6 +1158,37 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     />
                     <button type="button" onClick={() => addOrderTask(os.id)} style={ghostButton}>Adicionar</button>
                   </div>
+                </div>
+                <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
+                  <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>Execucao</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 180px) 1fr auto", gap: 8, alignItems: "center" }}>
+                    <select
+                      value={(executionDraft[os.id] || {}).membro_id || ""}
+                      onChange={(event) => updateExecutionDraft(os.id, "membro_id", event.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value="">Executor</option>
+                      {equipe.map((member) => <option key={member.id} value={member.id}>{member.nome}</option>)}
+                    </select>
+                    <input
+                      placeholder="O que foi feito?"
+                      value={(executionDraft[os.id] || {}).descricao || ""}
+                      onChange={(event) => updateExecutionDraft(os.id, "descricao", event.target.value)}
+                      style={inputStyle}
+                    />
+                    <button type="button" onClick={() => saveExecution(os.id)} style={ghostButton}>Registrar</button>
+                  </div>
+                  {(os.execucoes || []).length > 0 && (
+                    <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                      {(os.execucoes || []).slice(0, 3).map((execucao) => (
+                        <div key={execucao.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10 }}>
+                          <div style={{ color: C.white, fontSize: 12, fontWeight: 800 }}>{execucao.autor}</div>
+                          <div style={{ color: "rgba(255,255,255,0.62)", fontSize: 12, marginTop: 3 }}>{execucao.descricao}</div>
+                          <div style={{ color: "rgba(255,255,255,0.32)", fontSize: 10, marginTop: 4 }}>{execucao.criado_em ? String(execucao.criado_em).slice(0, 16).replace("T", " ") : "agora"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

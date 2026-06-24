@@ -125,6 +125,16 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   assert.equal(prestadorEditado.status, 200);
   assert.equal(prestadorEditado.body.disponibilidade, "ocupado");
 
+  const auxiliar = await request("/tripulacao", {
+    method: "POST",
+    body: JSON.stringify({
+      nome: "Auxiliar Um",
+      funcao: "Limpeza",
+      disponibilidade: "disponivel",
+    }),
+  }, first.body.token);
+  assert.equal(auxiliar.status, 201);
+
   const secondTeam = await request("/tripulacao", {}, second.body.token);
   assert.equal(secondTeam.body.some((item) => item.id === prestador.body.id), false);
 
@@ -162,6 +172,8 @@ test("isola dados entre empresas e aplica permissoes", async () => {
       cliente_id: createdClient.body.id,
       embarcacao_id: createdBoat.body.id,
       tipo: "Revisao",
+      responsavel_id: prestador.body.id,
+      auxiliares: [auxiliar.body.id],
       previsao: "2026-07-02",
       tarefas: ["Avaliar motor", "Testar navegacao"],
     }),
@@ -172,6 +184,24 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   assert.equal(createdOrder.body.embarcacao, "Lancha Privada");
   assert.equal(createdOrder.body.cliente_id, createdClient.body.id);
   assert.equal(createdOrder.body.embarcacao_id, createdBoat.body.id);
+  assert.equal(createdOrder.body.responsavel, "Tecnico Um");
+  assert.equal(createdOrder.body.responsavel_id, prestador.body.id);
+  assert.equal(createdOrder.body.auxiliares.length, 1);
+  assert.equal(createdOrder.body.auxiliares[0].nome, "Auxiliar Um");
+
+  const execution = await request(`/ordens/${createdOrder.body.id}/execucoes`, {
+    method: "POST",
+    body: JSON.stringify({
+      membro_id: prestador.body.id,
+      descricao: "Diagnostico inicial do motor",
+    }),
+  }, first.body.token);
+  assert.equal(execution.status, 201);
+  assert.equal(execution.body.autor, "Tecnico Um");
+
+  const orderWithExecution = await request("/ordens", {}, first.body.token);
+  assert.equal(orderWithExecution.body[0].execucoes.length, 1);
+  assert.equal(orderWithExecution.body[0].execucoes[0].descricao, "Diagnostico inicial do motor");
 
   const firstAgenda = await request("/agenda", {}, first.body.token);
   const secondAgenda = await request("/agenda", {}, second.body.token);

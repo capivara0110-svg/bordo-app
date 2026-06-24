@@ -78,7 +78,7 @@ Nota tecnica importante:
 
 - [x] Cadastro de funcoes operacionais: limpeza, marinharia, marinheiro, mecanico, eletrica, fibra, pintura, polimento
 - [x] Disponibilidade da equipe
-- [ ] Responsavel principal e auxiliares na OS
+- [x] Responsavel principal e auxiliares na OS
 - [x] Filtro de agenda por prestador/responsavel
 - [ ] Visao do prestador com apenas suas OS e tarefas
 

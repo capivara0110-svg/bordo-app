@@ -24,7 +24,13 @@ async function getOrder(id, empresaId) {
   const tarefas = await db.prepare(
     "SELECT * FROM os_tarefas WHERE os_id = ? ORDER BY id",
   ).all(order.id);
-  return { ...order, itens: tarefas };
+  const auxiliares = await db.prepare(
+    "SELECT * FROM os_auxiliares WHERE os_id = ? AND empresa_id = ? ORDER BY nome",
+  ).all(order.id, empresaId);
+  const execucoes = await db.prepare(
+    "SELECT * FROM os_execucoes WHERE os_id = ? AND empresa_id = ? ORDER BY criado_em DESC, id DESC",
+  ).all(order.id, empresaId);
+  return { ...order, itens: tarefas, auxiliares, execucoes };
 }
 
 async function getOrderPhotos(id, empresaId) {
@@ -84,6 +90,31 @@ async function resolveEmbarcacao(value, empresaId) {
   ).get(id, empresaId);
 }
 
+async function resolveMembro(value, empresaId) {
+  const id = Number(value) || null;
+  if (!id) return null;
+  return db.prepare(
+    "SELECT id, nome, funcao, cargo FROM tripulacao WHERE id = ? AND empresa_id = ?",
+  ).get(id, empresaId);
+}
+
+async function replaceAuxiliares(orderId, empresaId, values) {
+  await db.prepare(
+    "DELETE FROM os_auxiliares WHERE os_id = ? AND empresa_id = ?",
+  ).run(orderId, empresaId);
+
+  const ids = Array.isArray(values) ? values : [];
+  const uniqueIds = [...new Set(ids.map((item) => Number(item)).filter((id) => Number.isInteger(id) && id > 0))];
+  for (const id of uniqueIds) {
+    const membro = await resolveMembro(id, empresaId);
+    if (!membro) continue;
+    await db.prepare(
+      `INSERT INTO os_auxiliares (empresa_id,os_id,membro_id,nome,funcao)
+       VALUES (?,?,?,?,?)`,
+    ).run(empresaId, orderId, membro.id, membro.nome, membro.funcao || membro.cargo || "");
+  }
+}
+
 router.get("/", auth, async (req, res) => {
   const ordens = await db.prepare(
     `SELECT * FROM ordens_servico
@@ -91,12 +122,7 @@ router.get("/", auth, async (req, res) => {
      ORDER BY criado_em DESC`,
   ).all(req.usuario.empresa_id);
 
-  const result = await Promise.all(ordens.map(async (os) => {
-    const tarefas = await db.prepare(
-      "SELECT * FROM os_tarefas WHERE os_id = ? ORDER BY id",
-    ).all(os.id);
-    return { ...os, itens: tarefas };
-  }));
+  const result = await Promise.all(ordens.map((os) => getOrder(os.id, req.usuario.empresa_id)));
 
   return res.json(result);
 });
@@ -109,6 +135,9 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
   const cliente = selectedCliente?.nome || selectedEmbarcacao?.cliente_nome || clean(req.body.cliente);
   const clienteId = selectedCliente?.id || selectedEmbarcacao?.cliente_id || null;
   const embarcacaoId = selectedEmbarcacao?.id || null;
+  const selectedResponsavel = await resolveMembro(req.body.responsavel_id, req.usuario.empresa_id);
+  const responsavelNome = selectedResponsavel?.nome || clean(responsavel);
+  const responsavelId = selectedResponsavel?.id || null;
 
   if (!embarcacao) {
     return res.status(400).json({ erro: "Embarcacao obrigatoria" });
@@ -122,8 +151,8 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
 
   const result = await db.prepare(
     `INSERT INTO ordens_servico
-     (empresa_id,codigo,embarcacao,cliente,cliente_id,embarcacao_id,tipo,prioridade,descricao,responsavel,previsao)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+     (empresa_id,codigo,embarcacao,cliente,cliente_id,embarcacao_id,tipo,prioridade,descricao,responsavel,responsavel_id,previsao)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     req.usuario.empresa_id,
     codigo,
@@ -134,9 +163,12 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
     tipo || "Servico",
     allowedPriorities.includes(prioridade) ? prioridade : "normal",
     descricao || "",
-    responsavel || "",
+    responsavelNome,
+    responsavelId,
     previsao || "",
   );
+
+  await replaceAuxiliares(result.lastInsertRowid, req.usuario.empresa_id, req.body.auxiliares);
 
   for (const tarefa of cleanTaskList(tarefas)) {
     await db.prepare("INSERT INTO os_tarefas (os_id,tarefa,done) VALUES (?,?,?)")
@@ -163,6 +195,12 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
   const embarcacaoId = Object.prototype.hasOwnProperty.call(req.body, "embarcacao_id")
     ? selectedEmbarcacao?.id || null
     : current.embarcacao_id;
+  const selectedResponsavel = Object.prototype.hasOwnProperty.call(req.body, "responsavel_id")
+    ? await resolveMembro(req.body.responsavel_id, req.usuario.empresa_id)
+    : null;
+  const responsavelId = Object.prototype.hasOwnProperty.call(req.body, "responsavel_id")
+    ? selectedResponsavel?.id || null
+    : current.responsavel_id;
 
   const fields = {
     embarcacao: selectedEmbarcacao?.nome || String(req.body.embarcacao ?? current.embarcacao).trim(),
@@ -173,7 +211,8 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
     prioridade: allowedPriorities.includes(req.body.prioridade) ? req.body.prioridade : current.prioridade,
     status: allowedStatus.includes(req.body.status) ? req.body.status : current.status,
     descricao: String(req.body.descricao ?? current.descricao ?? "").trim(),
-    responsavel: String(req.body.responsavel ?? current.responsavel ?? "").trim(),
+    responsavel: selectedResponsavel?.nome || String(req.body.responsavel ?? current.responsavel ?? "").trim(),
+    responsavel_id: responsavelId,
     previsao: String(req.body.previsao ?? current.previsao ?? "").trim(),
     observacao: String(req.body.observacao ?? current.observacao ?? "").trim(),
   };
@@ -186,7 +225,7 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
     `UPDATE ordens_servico
      SET embarcacao = ?, cliente = ?, cliente_id = ?, embarcacao_id = ?,
          tipo = ?, prioridade = ?, status = ?,
-         descricao = ?, responsavel = ?, previsao = ?, observacao = ?
+         descricao = ?, responsavel = ?, responsavel_id = ?, previsao = ?, observacao = ?
      WHERE id = ? AND empresa_id = ?`,
   ).run(
     fields.embarcacao,
@@ -198,11 +237,16 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
     fields.status,
     fields.descricao,
     fields.responsavel,
+    fields.responsavel_id,
     fields.previsao,
     fields.observacao,
     req.params.id,
     req.usuario.empresa_id,
   );
+
+  if (Object.prototype.hasOwnProperty.call(req.body, "auxiliares")) {
+    await replaceAuxiliares(req.params.id, req.usuario.empresa_id, req.body.auxiliares);
+  }
 
   return res.json(await getOrder(req.params.id, req.usuario.empresa_id));
 });
@@ -260,6 +304,30 @@ router.post("/:id/fotos", auth, canManage, requirePlanoAtivo, async (req, res) =
     tipo: "ordem",
     referencia_id: Number(req.params.id),
     ...foto,
+  });
+});
+
+router.post("/:id/execucoes", auth, canManage, requirePlanoAtivo, async (req, res) => {
+  const order = await getOrder(req.params.id, req.usuario.empresa_id);
+  if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
+
+  const descricao = clean(req.body.descricao);
+  if (!descricao) return res.status(400).json({ erro: "Descricao obrigatoria" });
+
+  const membro = await resolveMembro(req.body.membro_id, req.usuario.empresa_id);
+  const autor = membro?.nome || clean(req.body.autor) || req.usuario.nome;
+  const result = await db.prepare(
+    `INSERT INTO os_execucoes (empresa_id,os_id,membro_id,autor,descricao)
+     VALUES (?,?,?,?,?)`,
+  ).run(req.usuario.empresa_id, req.params.id, membro?.id || null, autor, descricao);
+
+  return res.status(201).json({
+    id: result.lastInsertRowid,
+    empresa_id: req.usuario.empresa_id,
+    os_id: Number(req.params.id),
+    membro_id: membro?.id || null,
+    autor,
+    descricao,
   });
 });
 

@@ -178,6 +178,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(dados),
       }),
+    registrarExecucao: (id, dados) =>
+      request(`/ordens/${id}/execucoes`, {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
     toggleTarefa: (id, tarefaId) =>
       request(`/ordens/${id}/tarefa/${tarefaId}`, { method: "PUT" }),
   },
