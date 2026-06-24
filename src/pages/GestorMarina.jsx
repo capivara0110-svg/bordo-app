@@ -80,6 +80,9 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [editingBoatId, setEditingBoatId] = useState(null);
   const [clientMessage, setClientMessage] = useState("");
   const [boatMessage, setBoatMessage] = useState("");
+  const [clientHistory, setClientHistory] = useState(null);
+  const [boatHistory, setBoatHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState("");
 
   const tabs = [
     { id: "dashboard", icon: "📊", label: "Painel" },
@@ -284,6 +287,18 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     }
   };
 
+  const openClientHistory = async (cliente) => {
+    setHistoryLoading(`cliente-${cliente.id}`);
+    setClientMessage("");
+    try {
+      setClientHistory(await api.clientes.historico(cliente.id));
+    } catch (err) {
+      setClientMessage(err.message || "Nao foi possivel carregar o historico");
+    } finally {
+      setHistoryLoading("");
+    }
+  };
+
   const updateBoatForm = (field, value) => {
     setBoatForm((current) => ({ ...current, [field]: value }));
     setBoatMessage("");
@@ -327,6 +342,18 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       clearBoatForm();
     } catch (err) {
       setBoatMessage(err.message || "Nao foi possivel salvar a embarcacao");
+    }
+  };
+
+  const openBoatHistory = async (embarcacao) => {
+    setHistoryLoading(`embarcacao-${embarcacao.id}`);
+    setBoatMessage("");
+    try {
+      setBoatHistory(await api.embarcacoes.historico(embarcacao.id));
+    } catch (err) {
+      setBoatMessage(err.message || "Nao foi possivel carregar o historico");
+    } finally {
+      setHistoryLoading("");
     }
   };
 
@@ -424,6 +451,15 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
               <button type="submit" style={primarySmallButton}>{editingClientId ? "Salvar cliente" : "Cadastrar cliente"}</button>
             </form>
 
+            {clientHistory && (
+              <HistoryPanel
+                title={`Historico de ${clientHistory.cliente.nome}`}
+                subtitle={`${clientHistory.embarcacoes.length} embarcacao(oes) vinculada(s)`}
+                ordens={clientHistory.ordens}
+                onClose={() => setClientHistory(null)}
+              />
+            )}
+
             <div className="bordo-list-grid">
               {clientes.length === 0 && <StateMessage title="Nenhum cliente cadastrado" body="Cadastre o primeiro cliente para acelerar a abertura de OS." compact />}
               {clientes.map((cliente) => (
@@ -433,7 +469,12 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                       <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{cliente.nome}</div>
                       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{cliente.telefone || "Sem telefone"} · {cliente.email || "sem email"}</div>
                     </div>
-                    <button type="button" onClick={() => editClient(cliente)} style={ghostButton}>Editar</button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <button type="button" onClick={() => openClientHistory(cliente)} style={ghostButton}>
+                        {historyLoading === `cliente-${cliente.id}` ? "Abrindo..." : "Historico"}
+                      </button>
+                      <button type="button" onClick={() => editClient(cliente)} style={ghostButton}>Editar</button>
+                    </div>
                   </div>
                   {cliente.observacao && <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", margin: "10px 0 0" }}>{cliente.observacao}</p>}
                 </div>
@@ -496,6 +537,15 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
               <button type="submit" style={primarySmallButton}>{editingBoatId ? "Salvar embarcacao" : "Cadastrar embarcacao"}</button>
             </form>
 
+            {boatHistory && (
+              <HistoryPanel
+                title={`Historico de ${boatHistory.embarcacao.nome}`}
+                subtitle={boatHistory.embarcacao.cliente_nome || "Sem cliente vinculado"}
+                ordens={boatHistory.ordens}
+                onClose={() => setBoatHistory(null)}
+              />
+            )}
+
             <div className="bordo-list-grid">
               {embarcacoes.length === 0 && <StateMessage title="Nenhuma embarcacao cadastrada" body="Cadastre barcos para a OS puxar cliente e dados automaticamente." compact />}
               {embarcacoes.map((embarcacao) => (
@@ -505,7 +555,12 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                       <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{embarcacao.nome}</div>
                       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{embarcacao.cliente_nome || "Sem cliente"} · {embarcacao.tipo || "tipo livre"}</div>
                     </div>
-                    <button type="button" onClick={() => editBoat(embarcacao)} style={ghostButton}>Editar</button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <button type="button" onClick={() => openBoatHistory(embarcacao)} style={ghostButton}>
+                        {historyLoading === `embarcacao-${embarcacao.id}` ? "Abrindo..." : "Historico"}
+                      </button>
+                      <button type="button" onClick={() => editBoat(embarcacao)} style={ghostButton}>Editar</button>
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
                     {[embarcacao.tamanho, embarcacao.marca, embarcacao.modelo, embarcacao.registro].filter(Boolean).map((item) => (
@@ -824,6 +879,47 @@ function InlineMessage({ tone, children }) {
   );
 }
 
+function HistoryPanel({ title, subtitle, ordens, onClose }) {
+  return (
+    <section style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+        <div>
+          <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>{title}</div>
+          <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 3 }}>
+            {subtitle} · {ordens.length} ordem(ns) de servico
+          </div>
+        </div>
+        <button type="button" onClick={onClose} style={ghostButton}>Fechar</button>
+      </div>
+
+      {ordens.length === 0 && (
+        <StateMessage title="Sem historico ainda" body="Quando uma OS for aberta para este cadastro, ela aparece aqui." compact />
+      )}
+
+      {ordens.map((os) => (
+        <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.white }}>{os.codigo}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.42)" }}>
+                {os.embarcacao} · {os.cliente || "Cliente nao informado"}
+              </div>
+            </div>
+            <StatusBadge status={os.status} />
+          </div>
+          {os.descricao && <p style={{ color: "rgba(255,255,255,0.62)", fontSize: 12, margin: "8px 0" }}>{os.descricao}</p>}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <span style={tagStyle}>{os.tipo || "Servico"}</span>
+            <span style={tagStyle}>{os.prioridade || "normal"}</span>
+            <span style={tagStyle}>{os.responsavel || "Sem responsavel"}</span>
+            <span style={tagStyle}>{os.criado_em ? String(os.criado_em).slice(0, 10) : "Sem data"}</span>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 const panelStyle = {
   background: "rgba(255,255,255,0.06)",
   border: "1px solid rgba(255,255,255,0.08)",
@@ -860,4 +956,12 @@ const ghostButton = {
   padding: "9px 12px",
   fontWeight: 700,
   cursor: "pointer",
+};
+
+const tagStyle = {
+  fontSize: 10,
+  background: "rgba(255,255,255,0.08)",
+  borderRadius: 5,
+  padding: "2px 7px",
+  color: "rgba(255,255,255,0.5)",
 };

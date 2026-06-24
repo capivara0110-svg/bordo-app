@@ -142,6 +142,24 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   assert.equal(createdOrder.body.cliente_id, createdClient.body.id);
   assert.equal(createdOrder.body.embarcacao_id, createdBoat.body.id);
 
+  const clientHistory = await request(`/clientes/${createdClient.body.id}/historico`, {}, first.body.token);
+  assert.equal(clientHistory.status, 200);
+  assert.equal(clientHistory.body.cliente.nome, "Cliente Marina");
+  assert.equal(clientHistory.body.embarcacoes.length, 1);
+  assert.equal(clientHistory.body.ordens.length, 1);
+  assert.equal(clientHistory.body.ordens[0].codigo, createdOrder.body.codigo);
+
+  const boatHistory = await request(`/embarcacoes/${createdBoat.body.id}/historico`, {}, first.body.token);
+  assert.equal(boatHistory.status, 200);
+  assert.equal(boatHistory.body.embarcacao.nome, "Lancha Privada");
+  assert.equal(boatHistory.body.ordens.length, 1);
+  assert.equal(boatHistory.body.ordens[0].codigo, createdOrder.body.codigo);
+
+  const deniedClientHistory = await request(`/clientes/${createdClient.body.id}/historico`, {}, second.body.token);
+  const deniedBoatHistory = await request(`/embarcacoes/${createdBoat.body.id}/historico`, {}, second.body.token);
+  assert.equal(deniedClientHistory.status, 404);
+  assert.equal(deniedBoatHistory.status, 404);
+
   const editedOrder = await request(`/ordens/${createdOrder.body.id}`, {
     method: "PUT",
     body: JSON.stringify({

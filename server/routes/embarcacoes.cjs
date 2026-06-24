@@ -42,6 +42,19 @@ router.get("/", auth, async (req, res) => {
   return res.json(embarcacoes);
 });
 
+router.get("/:id/historico", auth, async (req, res) => {
+  const embarcacao = await getEmbarcacao(req.params.id, req.usuario.empresa_id);
+  if (!embarcacao) return res.status(404).json({ erro: "Embarcacao nao encontrada" });
+
+  const ordens = await db.prepare(
+    `SELECT * FROM ordens_servico
+     WHERE embarcacao_id = ? AND empresa_id = ?
+     ORDER BY criado_em DESC, id DESC`,
+  ).all(req.params.id, req.usuario.empresa_id);
+
+  return res.json({ embarcacao, ordens });
+});
+
 router.post("/", auth, canManage, async (req, res) => {
   const nome = clean(req.body.nome);
   if (!nome) return res.status(400).json({ erro: "Nome da embarcacao obrigatorio" });

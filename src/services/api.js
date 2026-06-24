@@ -110,6 +110,7 @@ export const api = {
   // ─── CADASTROS OPERACIONAIS ───────────────────────────
   clientes: {
     listar: () => request("/clientes"),
+    historico: (id) => request(`/clientes/${id}/historico`),
     criar: (dados) =>
       request("/clientes", {
         method: "POST",
@@ -124,6 +125,7 @@ export const api = {
 
   embarcacoes: {
     listar: () => request("/embarcacoes"),
+    historico: (id) => request(`/embarcacoes/${id}/historico`),
     criar: (dados) =>
       request("/embarcacoes", {
         method: "POST",
