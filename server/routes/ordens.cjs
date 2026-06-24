@@ -9,6 +9,30 @@ const canManage = requireAccess({
   roles: ["proprietario", "gestor", "tecnico"],
   profiles: ["gestor", "tecnico", "marinharia"],
 });
+const allowedStatus = ["aguardando", "em_andamento", "concluida", "cancelada"];
+const allowedPriorities = ["baixa", "media", "normal", "alta", "urgente"];
+
+async function getOrder(id, empresaId) {
+  const order = await db.prepare(
+    "SELECT * FROM ordens_servico WHERE id = ? AND empresa_id = ?",
+  ).get(id, empresaId);
+  if (!order) return null;
+
+  const tarefas = await db.prepare(
+    "SELECT * FROM os_tarefas WHERE os_id = ? ORDER BY id",
+  ).all(order.id);
+  return { ...order, itens: tarefas };
+}
+
+function cleanTaskList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 router.get("/", auth, async (req, res) => {
   const ordens = await db.prepare(
@@ -28,7 +52,7 @@ router.get("/", auth, async (req, res) => {
 });
 
 router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"), async (req, res) => {
-  const { embarcacao, cliente, tipo, prioridade, descricao, responsavel, previsao } = req.body;
+  const { embarcacao, cliente, tipo, prioridade, descricao, responsavel, previsao, tarefas } = req.body;
   if (!embarcacao) {
     return res.status(400).json({ erro: "Embarcacao obrigatoria" });
   }
@@ -49,28 +73,65 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
     embarcacao,
     cliente || "",
     tipo || "Servico",
-    prioridade || "normal",
+    allowedPriorities.includes(prioridade) ? prioridade : "normal",
     descricao || "",
     responsavel || "",
     previsao || "",
   );
 
-  return res.status(201).json({
-    id: result.lastInsertRowid,
-    empresa_id: req.usuario.empresa_id,
-    codigo,
-    embarcacao,
-    cliente,
-    tipo,
-    prioridade,
-    status: "aguardando",
-    itens: [],
-  });
+  for (const tarefa of cleanTaskList(tarefas)) {
+    await db.prepare("INSERT INTO os_tarefas (os_id,tarefa,done) VALUES (?,?,?)")
+      .run(result.lastInsertRowid, tarefa, 0);
+  }
+
+  const created = await getOrder(result.lastInsertRowid, req.usuario.empresa_id);
+  return res.status(201).json(created);
+});
+
+router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
+  const current = await getOrder(req.params.id, req.usuario.empresa_id);
+  if (!current) return res.status(404).json({ erro: "Ordem nao encontrada" });
+
+  const fields = {
+    embarcacao: String(req.body.embarcacao ?? current.embarcacao).trim(),
+    cliente: String(req.body.cliente ?? current.cliente ?? "").trim(),
+    tipo: String(req.body.tipo ?? current.tipo ?? "Servico").trim() || "Servico",
+    prioridade: allowedPriorities.includes(req.body.prioridade) ? req.body.prioridade : current.prioridade,
+    status: allowedStatus.includes(req.body.status) ? req.body.status : current.status,
+    descricao: String(req.body.descricao ?? current.descricao ?? "").trim(),
+    responsavel: String(req.body.responsavel ?? current.responsavel ?? "").trim(),
+    previsao: String(req.body.previsao ?? current.previsao ?? "").trim(),
+    observacao: String(req.body.observacao ?? current.observacao ?? "").trim(),
+  };
+
+  if (!fields.embarcacao) {
+    return res.status(400).json({ erro: "Embarcacao obrigatoria" });
+  }
+
+  await db.prepare(
+    `UPDATE ordens_servico
+     SET embarcacao = ?, cliente = ?, tipo = ?, prioridade = ?, status = ?,
+         descricao = ?, responsavel = ?, previsao = ?, observacao = ?
+     WHERE id = ? AND empresa_id = ?`,
+  ).run(
+    fields.embarcacao,
+    fields.cliente,
+    fields.tipo,
+    fields.prioridade,
+    fields.status,
+    fields.descricao,
+    fields.responsavel,
+    fields.previsao,
+    fields.observacao,
+    req.params.id,
+    req.usuario.empresa_id,
+  );
+
+  return res.json(await getOrder(req.params.id, req.usuario.empresa_id));
 });
 
 router.put("/:id/status", auth, canManage, requirePlanoAtivo, async (req, res) => {
-  const allowed = ["aguardando", "em_andamento", "concluida", "cancelada"];
-  if (!allowed.includes(req.body.status)) {
+  if (!allowedStatus.includes(req.body.status)) {
     return res.status(400).json({ erro: "Status invalido" });
   }
 
@@ -79,7 +140,19 @@ router.put("/:id/status", auth, canManage, requirePlanoAtivo, async (req, res) =
   ).run(req.body.status, req.params.id, req.usuario.empresa_id);
 
   if (!result.changes) return res.status(404).json({ erro: "Ordem nao encontrada" });
-  return res.json({ ok: true });
+  return res.json(await getOrder(req.params.id, req.usuario.empresa_id));
+});
+
+router.post("/:id/tarefas", auth, canManage, requirePlanoAtivo, async (req, res) => {
+  const order = await getOrder(req.params.id, req.usuario.empresa_id);
+  if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
+
+  const tarefa = String(req.body.tarefa || "").trim();
+  if (!tarefa) return res.status(400).json({ erro: "Tarefa obrigatoria" });
+
+  await db.prepare("INSERT INTO os_tarefas (os_id,tarefa,done) VALUES (?,?,?)")
+    .run(req.params.id, tarefa, 0);
+  return res.status(201).json(await getOrder(req.params.id, req.usuario.empresa_id));
 });
 
 router.put("/:id/tarefa/:tarefaId", auth, canManage, requirePlanoAtivo, async (req, res) => {
@@ -94,7 +167,7 @@ router.put("/:id/tarefa/:tarefaId", auth, canManage, requirePlanoAtivo, async (r
 
   await db.prepare("UPDATE os_tarefas SET done = ? WHERE id = ?")
     .run(tarefa.done ? 0 : 1, req.params.tarefaId);
-  return res.json({ ok: true });
+  return res.json(await getOrder(req.params.id, req.usuario.empresa_id));
 });
 
 module.exports = router;

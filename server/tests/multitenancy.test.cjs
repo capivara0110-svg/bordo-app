@@ -100,9 +100,41 @@ test("isola dados entre empresas e aplica permissoes", async () => {
 
   const createdOrder = await request("/ordens", {
     method: "POST",
-    body: JSON.stringify({ embarcacao: "Lancha Privada", tipo: "Revisao" }),
+    body: JSON.stringify({
+      embarcacao: "Lancha Privada",
+      tipo: "Revisao",
+      tarefas: ["Avaliar motor", "Testar navegacao"],
+    }),
   }, first.body.token);
   assert.equal(createdOrder.status, 201);
+  assert.equal(createdOrder.body.itens.length, 2);
+
+  const editedOrder = await request(`/ordens/${createdOrder.body.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      cliente: "Cliente Teste",
+      prioridade: "urgente",
+      status: "em_andamento",
+      responsavel: "Tecnico Um",
+    }),
+  }, first.body.token);
+  assert.equal(editedOrder.status, 200);
+  assert.equal(editedOrder.body.cliente, "Cliente Teste");
+  assert.equal(editedOrder.body.prioridade, "urgente");
+  assert.equal(editedOrder.body.status, "em_andamento");
+
+  const taskAdded = await request(`/ordens/${createdOrder.body.id}/tarefas`, {
+    method: "POST",
+    body: JSON.stringify({ tarefa: "Registrar fotos" }),
+  }, first.body.token);
+  assert.equal(taskAdded.status, 201);
+  assert.equal(taskAdded.body.itens.length, 3);
+
+  const taskToggled = await request(`/ordens/${createdOrder.body.id}/tarefa/${taskAdded.body.itens[0].id}`, {
+    method: "PUT",
+  }, first.body.token);
+  assert.equal(taskToggled.status, 200);
+  assert.equal(Number(taskToggled.body.itens[0].done), 1);
 
   const firstOrders = await request("/ordens", {}, first.body.token);
   const secondOrders = await request("/ordens", {}, second.body.token);
@@ -114,6 +146,13 @@ test("isola dados entre empresas e aplica permissoes", async () => {
     body: JSON.stringify({ status: "concluida" }),
   }, second.body.token);
   assert.equal(crossTenantUpdate.status, 404);
+
+  const statusUpdated = await request(`/ordens/${createdOrder.body.id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "concluida" }),
+  }, first.body.token);
+  assert.equal(statusUpdated.status, 200);
+  assert.equal(statusUpdated.body.status, "concluida");
 
   const memberEmail = `membro-${stamp}@teste.local`;
   const member = await request("/empresa/membros", {

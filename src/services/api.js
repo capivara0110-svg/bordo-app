@@ -110,17 +110,25 @@ export const api = {
   // ─── ORDENS DE SERVIÇO ────────────────────────────────
   ordens: {
     listar: () => request("/ordens"),
-    criar: (embarcacao, cliente, tipo, prioridade, descricao, responsavel) =>
+    criar: (dados) =>
       request("/ordens", {
         method: "POST",
-        body: JSON.stringify({
-          embarcacao, cliente, tipo, prioridade, descricao, responsavel,
-        }),
+        body: JSON.stringify(dados),
+      }),
+    editar: (id, dados) =>
+      request(`/ordens/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(dados),
       }),
     atualizarStatus: (id, status) =>
       request(`/ordens/${id}/status`, {
         method: "PUT",
         body: JSON.stringify({ status }),
+      }),
+    criarTarefa: (id, tarefa) =>
+      request(`/ordens/${id}/tarefas`, {
+        method: "POST",
+        body: JSON.stringify({ tarefa }),
       }),
     toggleTarefa: (id, tarefaId) =>
       request(`/ordens/${id}/tarefa/${tarefaId}`, { method: "PUT" }),
