@@ -235,6 +235,17 @@ async function migratePlanColumns() {
   await addColumn("empresas", "trial_termina_em TIMESTAMP");
 }
 
+async function migrateOperationalTeamColumns() {
+  await addColumn("tripulacao", "funcao TEXT DEFAULT ''");
+  await addColumn("tripulacao", "telefone TEXT DEFAULT ''");
+  await addColumn("tripulacao", "disponibilidade TEXT DEFAULT 'disponivel'");
+  await addColumn("tripulacao", "observacao TEXT DEFAULT ''");
+  await run("UPDATE tripulacao SET funcao = cargo WHERE funcao IS NULL OR funcao = ''");
+  await run("UPDATE tripulacao SET telefone = '' WHERE telefone IS NULL");
+  await run("UPDATE tripulacao SET disponibilidade = 'disponivel' WHERE disponibilidade IS NULL OR disponibilidade = ''");
+  await run("UPDATE tripulacao SET observacao = '' WHERE observacao IS NULL");
+}
+
 async function seed() {
   const count = await get("SELECT COUNT(*) AS total FROM usuarios");
   if (Number(count.total) > 0) return;
@@ -378,6 +389,17 @@ async function initialize() {
     await run(
       "INSERT INTO schema_migrations (version) VALUES (?)",
       ["002_plan_limits"],
+    );
+  }
+  const teamMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["003_operational_team"],
+  );
+  if (!teamMigration) {
+    await migrateOperationalTeamColumns();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["003_operational_team"],
     );
   }
   await seed();
