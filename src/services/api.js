@@ -103,6 +103,18 @@ export const api = {
   empresa: {
     dados: () => request("/empresa"),
     membros: () => request("/empresa/membros"),
+    convites: () => request("/empresa/convites"),
+    criarConvite: (dados) =>
+      request("/empresa/convites", {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
+    convitePublico: (token) => request(`/empresa/convites/${token}/publico`),
+    aceitarConvite: (token, dados) =>
+      request(`/empresa/convites/${token}/aceitar`, {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
     criarMembro: (dados) =>
       request("/empresa/membros", {
         method: "POST",

@@ -12,6 +12,14 @@ const emptyMember = {
   papel: "membro",
 };
 
+const emptyInvite = {
+  nome: "",
+  email: "",
+  cargo: "",
+  perfil: "marinheiro",
+  papel: "membro",
+};
+
 const roleLabels = {
   proprietario: "Proprietario",
   gestor: "Gestor",
@@ -45,8 +53,12 @@ const billingStatusLabels = {
 export default function MinhaEmpresa({ profile, onBack, onLegal }) {
   const [company, setCompany] = useState(null);
   const [members, setMembers] = useState([]);
+  const [invites, setInvites] = useState([]);
   const [form, setForm] = useState(emptyMember);
+  const [inviteForm, setInviteForm] = useState(emptyInvite);
   const [showForm, setShowForm] = useState(false);
+  const [showInviteForm, setShowInviteForm] = useState(true);
+  const [lastInviteLink, setLastInviteLink] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -63,11 +75,13 @@ export default function MinhaEmpresa({ profile, onBack, onLegal }) {
       const companyData = await api.empresa.dados();
       setCompany(companyData);
       if (canManage) {
-        const [membersData, subscriptionData] = await Promise.all([
+        const [membersData, invitesData, subscriptionData] = await Promise.all([
           api.empresa.membros(),
+          api.empresa.convites(),
           api.assinaturas.admin(),
         ]);
         setMembers(membersData);
+        setInvites(invitesData);
         setSubscriptions(subscriptionData);
       }
     } catch (requestError) {
@@ -116,6 +130,42 @@ export default function MinhaEmpresa({ profile, onBack, onLegal }) {
       setMessage("Permissao atualizada.");
     } catch (requestError) {
       setError(requestError.message || "Nao foi possivel alterar a permissao");
+    }
+  };
+
+  const updateInviteForm = (field, value) => {
+    setInviteForm((current) => ({ ...current, [field]: value }));
+    setError("");
+    setMessage("");
+  };
+
+  const createInvite = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setMessage("");
+    setLastInviteLink("");
+    try {
+      const convite = await api.empresa.criarConvite(inviteForm);
+      setInviteForm(emptyInvite);
+      setLastInviteLink(convite.link);
+      setMessage("Link de convite gerado. Agora e so enviar para o colaborador.");
+      setInvites(await api.empresa.convites());
+    } catch (requestError) {
+      setError(requestError.message || "Nao foi possivel gerar o convite");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyInviteLink = async (link) => {
+    setError("");
+    setMessage("");
+    try {
+      await navigator.clipboard.writeText(link);
+      setMessage("Link copiado para enviar no WhatsApp.");
+    } catch {
+      setError("Nao consegui copiar automaticamente. Segure no campo e copie o link.");
     }
   };
 
@@ -229,7 +279,7 @@ export default function MinhaEmpresa({ profile, onBack, onLegal }) {
                     <div>
                       <div style={{ color: C.white, fontSize: 14, fontWeight: 800 }}>{subscription.nome}</div>
                       <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 11, marginTop: 3 }}>
-                        {subscription.slug} · {subscription.plano} · {billingStatusLabels[subscription.billing_status] || subscription.billing_status}
+                        {subscription.slug} - {subscription.plano} - {billingStatusLabels[subscription.billing_status] || subscription.billing_status}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -262,11 +312,90 @@ export default function MinhaEmpresa({ profile, onBack, onLegal }) {
                   </h2>
                 </div>
                 {canManage && (
-                  <button type="button" onClick={() => setShowForm((value) => !value)} style={smallPrimaryButton}>
-                    {showForm ? "Cancelar" : "+ Colaborador"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <button type="button" onClick={() => setShowInviteForm((value) => !value)} style={smallPrimaryButton}>
+                      {showInviteForm ? "Fechar convite" : "Convidar"}
+                    </button>
+                    <button type="button" onClick={() => setShowForm((value) => !value)} style={ghostButton}>
+                      {showForm ? "Cancelar" : "Criar direto"}
+                    </button>
+                  </div>
                 )}
               </div>
+
+              {canManage && showInviteForm && (
+                <form onSubmit={createInvite} style={{ ...cardStyle, alignItems: "stretch", display: "grid", gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <div style={{ color: C.white, fontWeight: 900, fontSize: 16 }}>
+                      Link de convite para funcionario
+                    </div>
+                    <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>
+                      O gestor manda o link, o colaborador cria a propria senha e entra vinculado a esta empresa.
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                    <Field label="Nome opcional">
+                      <input value={inviteForm.nome} onChange={(event) => updateInviteForm("nome", event.target.value)} style={inputStyle} />
+                    </Field>
+                    <Field label="E-mail opcional">
+                      <input type="email" value={inviteForm.email} onChange={(event) => updateInviteForm("email", event.target.value)} style={inputStyle} />
+                    </Field>
+                    <Field label="Cargo">
+                      <input value={inviteForm.cargo} onChange={(event) => updateInviteForm("cargo", event.target.value)} placeholder="Ex.: Marinheiro, limpeza..." style={inputStyle} />
+                    </Field>
+                    <Field label="Area de trabalho">
+                      <select value={inviteForm.perfil} onChange={(event) => updateInviteForm("perfil", event.target.value)} style={inputStyle}>
+                        {Object.entries(profileLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Permissao">
+                      <select value={inviteForm.papel} onChange={(event) => updateInviteForm("papel", event.target.value)} style={inputStyle}>
+                        <option value="membro">Membro</option>
+                        <option value="tecnico">Tecnico</option>
+                        <option value="gestor">Gestor</option>
+                      </select>
+                    </Field>
+                  </div>
+                  <button type="submit" disabled={saving} style={smallPrimaryButton}>
+                    {saving ? "Gerando..." : "Gerar link de convite"}
+                  </button>
+
+                  {lastInviteLink && (
+                    <div style={{ background: "rgba(23,168,189,0.10)", border: "1px solid rgba(23,168,189,0.18)", borderRadius: 14, padding: 12 }}>
+                      <div style={{ color: C.aqua, fontSize: 11, fontWeight: 900, marginBottom: 8 }}>Link pronto</div>
+                      <input readOnly value={lastInviteLink} style={{ ...inputStyle, width: "100%" }} />
+                      <button type="button" onClick={() => copyInviteLink(lastInviteLink)} style={{ ...ghostButton, marginTop: 8 }}>
+                        Copiar link
+                      </button>
+                    </div>
+                  )}
+                </form>
+              )}
+
+              {canManage && invites.length > 0 && (
+                <section style={{ marginBottom: 14 }}>
+                  <div style={{ ...eyebrowStyle, marginBottom: 8 }}>Convites recentes</div>
+                  {invites.slice(0, 4).map((invite) => (
+                    <article key={invite.id} style={{ ...cardStyle, marginBottom: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: C.white, fontSize: 13, fontWeight: 800 }}>
+                          {invite.nome || invite.email || "Convite sem nome"}
+                        </div>
+                        <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 11, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {profileLabels[invite.perfil] || invite.perfil} - {roleLabels[invite.papel] || invite.papel}
+                        </div>
+                      </div>
+                      {Number(invite.usado) ? (
+                        <span style={roleBadge}>Usado</span>
+                      ) : (
+                        <button type="button" onClick={() => copyInviteLink(invite.link)} style={ghostButton}>
+                          Copiar
+                        </button>
+                      )}
+                    </article>
+                  ))}
+                </section>
+              )}
 
               {showForm && (
                 <form onSubmit={createMember} style={{ ...cardStyle, display: "grid", gap: 12, marginBottom: 14 }}>
@@ -309,7 +438,7 @@ export default function MinhaEmpresa({ profile, onBack, onLegal }) {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ color: C.white, fontSize: 14, fontWeight: 700 }}>{member.nome}</div>
                       <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {member.email} · {member.cargo || profileLabels[member.perfil]}
+                        {member.email} - {member.cargo || profileLabels[member.perfil]}
                       </div>
                     </div>
                   </div>

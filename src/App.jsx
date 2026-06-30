@@ -10,6 +10,7 @@ import Notificacoes from "./pages/Notificacoes.jsx";
 import TelasSuporte from "./pages/TelasSuporte.jsx";
 import MinhaEmpresa from "./pages/MinhaEmpresa.jsx";
 import Legal from "./pages/Legal.jsx";
+import AceitarConvite from "./pages/AceitarConvite.jsx";
 
 function buildProfile(user) {
   const perfilId = ["marinheiro", "marinharia", "tecnico", "gestor"].includes(user.perfil)
@@ -36,7 +37,11 @@ function buildProfile(user) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState("landing");
+  const initialInviteToken = typeof window !== "undefined"
+    ? window.location.pathname.match(/^\/convite\/([^/]+)/)?.[1] || ""
+    : "";
+  const [screen, setScreen] = useState(initialInviteToken ? "convite" : "landing");
+  const [inviteToken, setInviteToken] = useState(initialInviteToken);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +59,7 @@ export default function App() {
         const restoredProfile = buildProfile(user);
         setProfile(restoredProfile);
         localStorage.setItem("bordo_profile", JSON.stringify(restoredProfile));
-        setScreen("home");
+        if (!initialInviteToken) setScreen("home");
       } catch {
         localStorage.removeItem("bordo_token");
         localStorage.removeItem("bordo_profile");
@@ -76,6 +81,7 @@ export default function App() {
 
   const handleLogin = (userData) => {
     localStorage.setItem("bordo_token", userData.token);
+    setInviteToken("");
     navigate("home", buildProfile(userData.user));
   };
 
@@ -186,6 +192,17 @@ export default function App() {
       `}</style>
 
       {screen === "landing" && <Landing onStart={() => navigate("login")} />}
+      {screen === "convite" && (
+        <AceitarConvite
+          token={inviteToken}
+          onAccepted={handleLogin}
+          onBack={() => {
+            window.history.replaceState(null, "", "/");
+            setInviteToken("");
+            navigate("landing");
+          }}
+        />
+      )}
       {screen === "login" && <Login onLogin={handleLogin} onBack={() => navigate("landing")} />}
       {screen === "home" && profile?.id === "gestor" && (
         <GestorMarina
