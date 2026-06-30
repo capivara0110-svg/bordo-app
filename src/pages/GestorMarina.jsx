@@ -301,11 +301,17 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     if (!reportPanel?.ordem) return;
     const ordem = reportPanel.ordem;
     const total = reportPanel.orcamento ? money(reportPanel.orcamento.total) : "";
+    const tarefas = reportPanel.tarefas || [];
+    const feitas = tarefas.filter((item) => Number(item.done)).length;
     const texto = [
-      `Relatorio da ${ordem.codigo} - ${ordem.embarcacao}`,
+      `BORDO - Relatorio da ${ordem.codigo}`,
+      `Embarcacao/servico: ${ordem.embarcacao}`,
       ordem.cliente ? `Cliente: ${ordem.cliente}` : "",
-      total ? `Total: ${total}` : "",
+      ordem.local ? `Local: ${ordem.local}` : "",
       `Status: ${ordem.status}`,
+      `Checklist: ${feitas}/${tarefas.length} tarefa(s) concluidas`,
+      total ? `Total: ${total}` : "",
+      "Acesse o BORDO para ver fotos e detalhes:",
       window.location.href,
     ].filter(Boolean).join("\n");
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
@@ -1419,6 +1425,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                 <button type="button" onClick={startManualServiceOrder} style={{ ...ghostButton, width: "100%" }}>
                   Criar OS avulsa sem vincular barco
                 </button>
+                <div style={{ color: C.aqua, fontSize: 11, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase" }}>Identificacao</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
                   <Field label="Barco cadastrado (opcional)">
                     <select value={orderForm.embarcacao_id} onChange={(event) => selectOrderBoat(event.target.value)} style={inputStyle}>
@@ -1451,6 +1458,9 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <Field label="Tipo">
                     <input value={orderForm.tipo} onChange={(event) => updateOrderForm("tipo", event.target.value)} style={inputStyle} />
                   </Field>
+                </div>
+                <div style={{ color: C.aqua, fontSize: 11, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase" }}>Execucao</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
                   <Field label="Responsavel">
                     <select value={orderForm.responsavel_id} onChange={(event) => selectOrderResponsible(event.target.value)} style={inputStyle}>
                       <option value="">Digitar manualmente</option>
@@ -1481,6 +1491,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     </Field>
                   )}
                 </div>
+                <div style={{ color: C.aqua, fontSize: 11, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase" }}>Checklist e descricao</div>
                 <Field label="Auxiliares">
                   <div style={{ ...panelStyle, padding: 10, display: "grid", gap: 8 }}>
                     {equipe.length === 0 && <span style={{ color: "rgba(255,255,255,0.42)", fontSize: 12 }}>Cadastre a equipe para selecionar auxiliares.</span>}
@@ -1545,6 +1556,11 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <button type="button" onClick={() => openPhotoPanel("ordem", os)} style={ghostButton}>Fotos ({Number(os.fotos || 0)})</button>
                   <button type="button" onClick={() => startEditOrder(os)} style={ghostButton}>Editar</button>
                 </div>
+                {os.status !== "concluida" && os.status !== "cancelada" && (
+                  <button type="button" onClick={() => updateOrderStatus(os.id, "concluida")} style={{ ...primarySmallButton, width: "100%", marginTop: 8 }}>
+                    Concluir OS
+                  </button>
+                )}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
                   <button type="button" onClick={() => setExpandedOrders((current) => ({ ...current, [os.id]: !current[os.id] }))} style={ghostButton}>
                     {expandedOrders[os.id] ? "Ocultar detalhes" : "Ver detalhes"}
