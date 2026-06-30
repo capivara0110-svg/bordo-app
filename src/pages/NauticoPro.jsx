@@ -24,6 +24,7 @@ export default function NauticoPro({ profile, onLogout }) {
   const [photoForm, setPhotoForm] = useState({ url: "", legenda: "", categoria: "geral" });
   const [photoMessage, setPhotoMessage] = useState("");
   const [photoSaving, setPhotoSaving] = useState(false);
+  const [orderMessage, setOrderMessage] = useState("");
 
   const tabs = fullProfile.tabs || [
     { id: "diario", icon: "📋", label: "Diário" },
@@ -107,6 +108,16 @@ export default function NauticoPro({ profile, onLogout }) {
     setPhotoPanel(null);
     setPhotoForm({ url: "", legenda: "", categoria: "geral" });
     setPhotoMessage("");
+  };
+
+  const toggleOrderTask = async (orderId, taskId) => {
+    setOrderMessage("");
+    try {
+      const updated = await api.ordens.toggleTarefa(orderId, taskId);
+      setOrdens((current) => current.map((os) => (os.id === orderId ? updated : os)));
+    } catch (err) {
+      setOrderMessage(err.message || "Nao foi possivel marcar a tarefa.");
+    }
   };
 
   const updatePhotoFile = async (file) => {
@@ -355,9 +366,13 @@ export default function NauticoPro({ profile, onLogout }) {
         return (
           <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Ordens</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{ordens.length} ordens</div>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Minhas OS</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{ordens.length} servicos atribuidos</div>
+              <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 4 }}>
+                Execute o checklist, registre fotos e avance o servico.
+              </div>
             </div>
+            {orderMessage && <div style={{ color: C.rust, background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>{orderMessage}</div>}
             {photoPanel && (
               <PhotoPanel
                 panel={photoPanel}
@@ -371,26 +386,60 @@ export default function NauticoPro({ profile, onLogout }) {
               />
             )}
             <div className="bordo-list-grid">
-            {ordens.map(os => (
-              <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{os.codigo}</div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{os.embarcacao} · {os.cliente || "Sem cliente"}</div>
+            {ordens.map(os => {
+              const tasks = os.itens || [];
+              const done = tasks.filter((item) => Number(item.done)).length;
+              const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+              return (
+                <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{os.codigo}</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{os.embarcacao} · {os.cliente || "Sem cliente"}</div>
+                      {os.local && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 3 }}>Local: {os.local}</div>}
+                    </div>
+                    <StatusBadge status={os.status} />
                   </div>
-                  <StatusBadge status={os.status} />
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 8, lineHeight: 1.4 }}>{os.descricao}</p>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.tipo}</span>
+                    <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.prioridade}</span>
+                    <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{done}/{tasks.length} tarefas</span>
+                  </div>
+
+                  <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 800, marginBottom: 8 }}>
+                      <span>Checklist do servico</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div style={{ background: "rgba(255,255,255,0.10)", borderRadius: 99, height: 6, marginBottom: 8 }}>
+                      <div style={{ width: `${progress}%`, height: "100%", borderRadius: 99, background: C.aqua }} />
+                    </div>
+                    {tasks.length === 0 && <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>Esta OS ainda nao tem checklist.</div>}
+                    {tasks.map((item) => (
+                      <button key={item.id} type="button" onClick={() => toggleOrderTask(os.id, item.id)} style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%",
+                        background: "transparent", border: "none", padding: "7px 0", textAlign: "left", cursor: "pointer",
+                        color: Number(item.done) ? "rgba(255,255,255,0.42)" : "rgba(255,255,255,0.76)",
+                        textDecoration: Number(item.done) ? "line-through" : "none",
+                      }}>
+                        <span style={{
+                          width: 19, height: 19, borderRadius: 6, flexShrink: 0,
+                          border: `2px solid ${Number(item.done) ? C.green : "rgba(255,255,255,0.20)"}`,
+                          background: Number(item.done) ? C.green : "transparent",
+                          color: C.white, fontSize: 10, display: "grid", placeItems: "center",
+                        }}>{Number(item.done) ? "✓" : ""}</span>
+                        <span style={{ fontSize: 12 }}>{item.tarefa}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <button type="button" onClick={() => openPhotoPanel(os)} style={{ marginTop: 10, width: "100%", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.72)", padding: "9px 12px", fontWeight: 700, cursor: "pointer" }}>
+                    Fotos ({Number(os.fotos || 0)})
+                  </button>
                 </div>
-                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 8, lineHeight: 1.4 }}>{os.descricao}</p>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.tipo}</span>
-                  <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.prioridade}</span>
-                  <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.abertura}</span>
-                </div>
-                <button type="button" onClick={() => openPhotoPanel(os)} style={{ marginTop: 10, width: "100%", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.72)", padding: "9px 12px", fontWeight: 700, cursor: "pointer" }}>
-                  Fotos ({Number(os.fotos || 0)})
-                </button>
-              </div>
-            ))}
+              );
+            })}
             </div>
           </div>
         );
