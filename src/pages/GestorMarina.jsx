@@ -175,15 +175,16 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [reportAcceptName, setReportAcceptName] = useState("");
   const [notificationDraft, setNotificationDraft] = useState({ canal: "app", titulo: "", corpo: "", destinatario: "" });
   const [operationMessage, setOperationMessage] = useState("");
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const tabs = [
     { id: "dashboard", icon: "📊", label: "Painel" },
     { id: "clientes", icon: "🧾", label: "Clientes" },
     { id: "embarcacoes", icon: "🛥️", label: "Barcos" },
+    { id: "ordens", icon: "🔧", label: "OS" },
     { id: "agenda", icon: "📅", label: "Agenda" },
-    { id: "operacao", icon: "🧭", label: "Operação" },
     { id: "equipe", icon: "👥", label: "Equipe" },
-    { id: "ordens", icon: "🔧", label: "Ordens" },
+    { id: "operacao", icon: "🧭", label: "Operação" },
     { id: "bercos", icon: "⚓", label: "Berços" },
   ];
 
@@ -424,6 +425,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     setEditingOrderId(null);
     setShowOrderForm(true);
     setOrderMessage("");
+    setTimeout(() => document.querySelector("[data-order-form]")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const startEditOrder = (order) => {
@@ -1344,7 +1346,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
             )}
 
             {showOrderForm && (
-              <form onSubmit={saveOrder} style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+              <form data-order-form onSubmit={saveOrder} style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                   <div>
                     <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>
@@ -1596,7 +1598,14 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   };
 
   return (
-    <div className="bordo-app-screen" style={{ minHeight: "100vh", background: C.ocean, paddingBottom: 80, maxWidth: 480, margin: "0 auto", position: "relative" }}>
+    <div
+      className="bordo-app-screen"
+      onFocusCapture={(event) => {
+        if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) setKeyboardOpen(true);
+      }}
+      onBlurCapture={() => setTimeout(() => setKeyboardOpen(false), 120)}
+      style={{ minHeight: "100vh", background: C.ocean, paddingBottom: keyboardOpen ? 180 : 80, maxWidth: 480, margin: "0 auto", position: "relative" }}
+    >
       <Header title={profile.company?.name || "Minha empresa"} sub="Painel do Gestor" color={C.green} />
       <div className="bordo-desktop-only" style={{ color: "rgba(255,255,255,0.44)", fontSize: 14, margin: "-8px 0 20px" }}>
         Visao geral da operacao, equipe, ordens de servico e ocupacao da marina.
@@ -1608,14 +1617,17 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
         maxWidth: 480, width: "100%",
         background: "rgba(10,37,64,0.95)", backdropFilter: "blur(12px)",
         borderTop: "1px solid rgba(255,255,255,0.06)",
-        display: "flex", justifyContent: "space-around", padding: "6px 0",
+        display: keyboardOpen ? "none" : "flex", justifyContent: "flex-start", gap: 4, padding: "6px 6px",
         paddingBottom: "calc(6px + env(safe-area-inset-bottom, 6px))",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
         zIndex: 100
       }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-            background: "transparent", border: "none", cursor: "pointer", padding: "6px 12px",
+            background: "transparent", border: "none", cursor: "pointer", padding: "6px 8px",
+            minWidth: 58,
             opacity: tab === t.id ? 1 : 0.4, transition: "opacity 0.2s"
           }}>
             <span style={{ fontSize: 20 }}>{t.icon}</span>

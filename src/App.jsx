@@ -107,7 +107,7 @@ export default function App() {
         #root { min-height: 100vh; background: ${C.ocean}; }
         input:focus { border-color: ${C.aqua} !important; box-shadow: 0 0 0 3px rgba(23,168,189,0.15); }
         button:active { opacity: 0.85; }
-        .bordo-page-body { padding: 16px 16px 24px; }
+        .bordo-page-body { padding: 16px 16px 140px; }
         .bordo-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .bordo-list-grid > * { min-width: 0; }
         .bordo-desktop-only { display: none; }
