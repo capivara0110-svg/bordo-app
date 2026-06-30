@@ -266,6 +266,9 @@ export default function Landing({ onStart }) {
         <button onClick={onStart} style={{ background: C.aqua, color: C.white, border: "none", borderRadius: 14, padding: "18px 48px", fontFamily: fonts.display, fontSize: 18, fontWeight: 700, cursor: "pointer" }}>
           Criar conta gratuita →
         </button>
+        <button onClick={onStart} style={{ display: "block", margin: "14px auto 0", background: "transparent", border: "none", color: "rgba(255,255,255,0.62)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+          Ja tenho conta, entrar
+        </button>
         <div style={{ marginTop: 20, fontSize: 13, color: "rgba(255,255,255,0.25)" }}>Disponível para Android e iOS · Funciona offline</div>
       </section>
 

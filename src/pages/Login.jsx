@@ -238,6 +238,9 @@ export default function Login({ onLogin, onBack }) {
             <p style={{ fontSize: 11, lineHeight: 1.5, color: C.gray, textAlign: "center" }}>
               Ao continuar, sua conta sera criada como proprietario da empresa.
             </p>
+            <button type="button" onClick={() => switchMode("login")} style={{ ...secondaryButton, marginTop: 0, color: C.ocean, fontWeight: 700 }}>
+              Ja tenho conta, fazer login
+            </button>
           </form>
         )}
 
