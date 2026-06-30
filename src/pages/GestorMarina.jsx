@@ -18,6 +18,7 @@ const emptyOrder = {
   responsavel_id: "",
   responsavel: "",
   auxiliares: [],
+  local: "",
   previsao: "",
   observacao: "",
   tarefas: "",
@@ -229,7 +230,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
 
   const filteredOrders = ordens.filter((os) => {
     const matchesStatus = orderFilter === "todos" || os.status === orderFilter;
-    const text = `${os.codigo} ${os.embarcacao} ${os.cliente} ${os.responsavel} ${os.descricao}`.toLowerCase();
+    const text = `${os.codigo} ${os.embarcacao} ${os.cliente} ${os.local} ${os.responsavel} ${os.descricao}`.toLowerCase();
     return matchesStatus && text.includes(orderSearch.trim().toLowerCase());
   });
 
@@ -454,6 +455,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       responsavel_id: order.responsavel_id || "",
       responsavel: order.responsavel || "",
       auxiliares: (order.auxiliares || []).map((item) => Number(item.membro_id)),
+      local: order.local || "",
       previsao: order.previsao || "",
       observacao: order.observacao || "",
       tarefas: "",
@@ -1416,6 +1418,9 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                       <input value={orderForm.responsavel} onChange={(event) => updateOrderForm("responsavel", event.target.value)} style={inputStyle} />
                     </Field>
                   )}
+                  <Field label="Local / Marina">
+                    <input value={orderForm.local} onChange={(event) => updateOrderForm("local", event.target.value)} style={inputStyle} placeholder="Ex.: Marina Itajai, vaga 12" />
+                  </Field>
                   <Field label="Previsao">
                     <input value={orderForm.previsao} onChange={(event) => updateOrderForm("previsao", event.target.value)} style={inputStyle} placeholder="Ex.: 28/06/2026" />
                   </Field>
@@ -1469,6 +1474,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{os.codigo}</div>
                     <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{os.embarcacao} · {os.cliente || "—"}</div>
+                    {os.local && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.36)", marginTop: 3 }}>Local: {os.local}</div>}
                   </div>
                   <StatusBadge status={os.status} />
                 </div>
@@ -1831,6 +1837,11 @@ function ReportPanel({ report, message, acceptName, onAcceptName, onAccept, onPr
             ["Marca/modelo", [embarcacao.marca, embarcacao.modelo].filter(Boolean).join(" ") || "-"],
             ["Registro", embarcacao.registro || "-"],
           ]} />
+          <ReportBox title="Local" rows={[
+            ["Marina/local", ordem.local || "-"],
+            ["Previsao", ordem.previsao || "-"],
+            ["Responsavel", ordem.responsavel || "-"],
+          ]} />
         </ReportGrid>
 
         <div>
@@ -1975,6 +1986,7 @@ function HistoryPanel({ title, subtitle, ordens, onClose }) {
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.42)" }}>
                 {os.embarcacao} · {os.cliente || "Cliente nao informado"}
               </div>
+              {os.local && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.36)", marginTop: 3 }}>Local: {os.local}</div>}
             </div>
             <StatusBadge status={os.status} />
           </div>
@@ -2013,6 +2025,7 @@ function AgendaCard({ os, muted }) {
         <div>
           <div style={{ fontSize: 14, color: C.white, fontWeight: 800 }}>{os.codigo}</div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{dateKey(os.previsao)} · {os.embarcacao}</div>
+          {os.local && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 3 }}>Local: {os.local}</div>}
         </div>
         <StatusBadge status={os.status} />
       </div>

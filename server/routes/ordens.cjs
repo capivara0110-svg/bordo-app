@@ -317,6 +317,7 @@ router.get("/modelos", auth, async (req, res) => {
 
 router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"), async (req, res) => {
   const { tipo, prioridade, descricao, responsavel, previsao, tarefas } = req.body;
+  const local = clean(req.body.local).slice(0, 160);
   const selectedTemplate = serviceTemplates[clean(req.body.modelo || "").toLowerCase()]
     || serviceTemplates[clean(tipo).toLowerCase()];
   const selectedCliente = await resolveCliente(req.body.cliente_id, req.usuario.empresa_id);
@@ -337,8 +338,8 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
 
   const result = await db.prepare(
     `INSERT INTO ordens_servico
-     (empresa_id,codigo,embarcacao,cliente,cliente_id,embarcacao_id,tipo,prioridade,descricao,responsavel,responsavel_id,previsao)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+     (empresa_id,codigo,embarcacao,cliente,cliente_id,embarcacao_id,tipo,prioridade,descricao,responsavel,responsavel_id,local,previsao)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     req.usuario.empresa_id,
     codigo,
@@ -351,6 +352,7 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
     descricao || "",
     responsavelNome,
     responsavelId,
+    local,
     previsao || "",
   );
 
@@ -402,6 +404,7 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
     descricao: String(req.body.descricao ?? current.descricao ?? "").trim(),
     responsavel: selectedResponsavel?.nome || String(req.body.responsavel ?? current.responsavel ?? "").trim(),
     responsavel_id: responsavelId,
+    local: String(req.body.local ?? current.local ?? "").trim().slice(0, 160),
     previsao: String(req.body.previsao ?? current.previsao ?? "").trim(),
     observacao: String(req.body.observacao ?? current.observacao ?? "").trim(),
   };
@@ -410,7 +413,7 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
     `UPDATE ordens_servico
      SET embarcacao = ?, cliente = ?, cliente_id = ?, embarcacao_id = ?,
          tipo = ?, prioridade = ?, status = ?,
-         descricao = ?, responsavel = ?, responsavel_id = ?, previsao = ?, observacao = ?
+         descricao = ?, responsavel = ?, responsavel_id = ?, local = ?, previsao = ?, observacao = ?
      WHERE id = ? AND empresa_id = ?`,
   ).run(
     fields.embarcacao,
@@ -423,6 +426,7 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
     fields.descricao,
     fields.responsavel,
     fields.responsavel_id,
+    fields.local,
     fields.previsao,
     fields.observacao,
     req.params.id,

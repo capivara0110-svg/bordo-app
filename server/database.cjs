@@ -136,7 +136,7 @@ async function createSchema() {
       cliente TEXT DEFAULT '', cliente_id INTEGER, embarcacao_id INTEGER,
       tipo TEXT DEFAULT 'Servico', prioridade TEXT DEFAULT 'normal',
       status TEXT DEFAULT 'aguardando', descricao TEXT DEFAULT '', responsavel TEXT DEFAULT '', responsavel_id INTEGER,
-      abertura TEXT DEFAULT '', previsao TEXT DEFAULT '', fotos INTEGER DEFAULT 0,
+      local TEXT DEFAULT '', abertura TEXT DEFAULT '', previsao TEXT DEFAULT '', fotos INTEGER DEFAULT 0,
       relatorio_aceito INTEGER DEFAULT 0, relatorio_aceito_por TEXT DEFAULT '', relatorio_aceito_em TIMESTAMP,
       observacao TEXT DEFAULT '', criado_em TIMESTAMP DEFAULT ${now}
     )`,
@@ -350,6 +350,10 @@ async function migrateOrderLinkColumns() {
     await execute("CREATE INDEX IF NOT EXISTS idx_ordens_embarcacao ON ordens_servico (empresa_id, embarcacao_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_ordens_cliente ON ordens_servico (empresa_id, cliente_id)");
   }
+}
+
+async function migrateOrderLocationColumn() {
+  await addColumn("ordens_servico", "local TEXT DEFAULT ''");
 }
 
 async function migratePhotoStorageColumns() {
@@ -696,6 +700,17 @@ async function initialize() {
     await run(
       "INSERT INTO schema_migrations (version) VALUES (?)",
       ["011_order_links"],
+    );
+  }
+  const orderLocationMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["012_order_location"],
+  );
+  if (!orderLocationMigration) {
+    await migrateOrderLocationColumn();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["012_order_location"],
     );
   }
   await seed();
