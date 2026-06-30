@@ -3,6 +3,7 @@ import { C, fonts } from "../styles/theme.js";
 import { api } from "../services/api.js";
 import { PERFIS_SISTEMA } from "../data/mock.js";
 import StatusBadge from "../components/StatusBadge.jsx";
+import { compressImageFile } from "../utils/photos.js";
 
 export default function NauticoPro({ profile, onLogout }) {
   const fullProfile = PERFIS_SISTEMA.find(p => p.id === profile.id) || profile;
@@ -108,24 +109,24 @@ export default function NauticoPro({ profile, onLogout }) {
     setPhotoMessage("");
   };
 
-  const updatePhotoFile = (file) => {
+  const updatePhotoFile = async (file) => {
     setPhotoMessage("");
     if (!file) {
       setPhotoForm((current) => ({ ...current, url: "" }));
       return;
     }
-    if (!file.type.startsWith("image/")) {
+    if (file.type && !file.type.startsWith("image/")) {
       setPhotoMessage("Selecione uma imagem valida.");
       return;
     }
-    if (file.size > 520000) {
-      setPhotoMessage("Use uma foto menor por enquanto. Limite aproximado: 500 KB.");
-      return;
+    setPhotoMessage("Compactando foto...");
+    try {
+      const url = await compressImageFile(file);
+      setPhotoForm((current) => ({ ...current, url }));
+      setPhotoMessage("Foto pronta para salvar.");
+    } catch (err) {
+      setPhotoMessage(err.message || "Nao foi possivel processar a foto.");
     }
-    const reader = new FileReader();
-    reader.onload = () => setPhotoForm((current) => ({ ...current, url: String(reader.result || "") }));
-    reader.onerror = () => setPhotoMessage("Nao foi possivel ler a foto.");
-    reader.readAsDataURL(file);
   };
 
   const savePhoto = async (event) => {
@@ -485,7 +486,7 @@ function PhotoPanel({ panel, form, message, saving, onClose, onSubmit, onFile, o
         <button type="button" onClick={onClose} style={ghostButton}>Fechar</button>
       </div>
 
-      {message && <div style={{ color: message.includes("sucesso") ? C.green : C.rust, background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 700 }}>{message}</div>}
+      {message && <div style={{ color: /sucesso|pronta|compactando/i.test(message) ? C.green : C.rust, background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 700 }}>{message}</div>}
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
         <label style={fieldStyle}>

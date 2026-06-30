@@ -3,6 +3,7 @@ import { C, fonts } from "../styles/theme.js";
 import { api } from "../services/api.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import Header from "../components/Header.jsx";
+import { compressImageFile } from "../utils/photos.js";
 
 const emptyOrder = {
   modelo: "",
@@ -307,24 +308,24 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
   };
 
-  const updatePhotoFile = (file) => {
+  const updatePhotoFile = async (file) => {
     setPhotoMessage("");
     if (!file) {
       setPhotoForm((current) => ({ ...current, url: "" }));
       return;
     }
-    if (!file.type.startsWith("image/")) {
+    if (file.type && !file.type.startsWith("image/")) {
       setPhotoMessage("Selecione uma imagem valida.");
       return;
     }
-    if (file.size > 520000) {
-      setPhotoMessage("Use uma foto menor por enquanto. Limite aproximado: 500 KB.");
-      return;
+    setPhotoMessage("Compactando foto...");
+    try {
+      const url = await compressImageFile(file);
+      setPhotoForm((current) => ({ ...current, url }));
+      setPhotoMessage("Foto pronta para salvar.");
+    } catch (err) {
+      setPhotoMessage(err.message || "Nao foi possivel processar a foto.");
     }
-    const reader = new FileReader();
-    reader.onload = () => setPhotoForm((current) => ({ ...current, url: String(reader.result || "") }));
-    reader.onerror = () => setPhotoMessage("Nao foi possivel ler a foto.");
-    reader.readAsDataURL(file);
   };
 
   const savePhoto = async (event) => {
@@ -1788,7 +1789,7 @@ function ReportPanel({ report, message, acceptName, onAcceptName, onAccept, onPr
         </div>
       </div>
 
-      {message && <InlineMessage tone={message.includes("sucesso") ? "success" : "error"}>{message}</InlineMessage>}
+      {message && <InlineMessage tone={/sucesso|pronta|compactando/i.test(message) ? "success" : "error"}>{message}</InlineMessage>}
 
       <div className="bordo-report-sheet" style={{ background: "#ffffff", color: "#162033", borderRadius: 12, padding: 18, display: "grid", gap: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, borderBottom: "1px solid #d9e1ea", paddingBottom: 12 }}>
@@ -2030,7 +2031,7 @@ function PhotoPanel({ panel, form, message, saving, onClose, onSubmit, onFile, o
         <button type="button" onClick={onClose} style={ghostButton}>Fechar</button>
       </div>
 
-      {message && <InlineMessage tone={message.includes("sucesso") ? "success" : "error"}>{message}</InlineMessage>}
+      {message && <InlineMessage tone={/sucesso|pronta|compactando/i.test(message) ? "success" : "error"}>{message}</InlineMessage>}
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
