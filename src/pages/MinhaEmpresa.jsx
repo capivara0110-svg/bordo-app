@@ -32,7 +32,17 @@ const metricLabels = {
   diarioMes: "Diario no mes",
 };
 
-export default function MinhaEmpresa({ profile, onBack }) {
+const billingStatusLabels = {
+  trialing: "Teste",
+  pending: "Pendente",
+  active: "Ativa",
+  past_due: "Inadimplente",
+  unpaid: "Nao paga",
+  canceled: "Cancelada",
+  blocked: "Bloqueada",
+};
+
+export default function MinhaEmpresa({ profile, onBack, onLegal }) {
   const [company, setCompany] = useState(null);
   const [members, setMembers] = useState([]);
   const [form, setForm] = useState(emptyMember);
@@ -41,6 +51,8 @@ export default function MinhaEmpresa({ profile, onBack }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [checkout, setCheckout] = useState(null);
+  const [subscriptions, setSubscriptions] = useState([]);
 
   const canManage = ["proprietario", "gestor"].includes(profile?.accessRole);
 
@@ -50,7 +62,14 @@ export default function MinhaEmpresa({ profile, onBack }) {
     try {
       const companyData = await api.empresa.dados();
       setCompany(companyData);
-      if (canManage) setMembers(await api.empresa.membros());
+      if (canManage) {
+        const [membersData, subscriptionData] = await Promise.all([
+          api.empresa.membros(),
+          api.assinaturas.admin(),
+        ]);
+        setMembers(membersData);
+        setSubscriptions(subscriptionData);
+      }
     } catch (requestError) {
       setError(requestError.message || "Nao foi possivel carregar a empresa");
     } finally {
@@ -97,6 +116,31 @@ export default function MinhaEmpresa({ profile, onBack }) {
       setMessage("Permissao atualizada.");
     } catch (requestError) {
       setError(requestError.message || "Nao foi possivel alterar a permissao");
+    }
+  };
+
+  const createCheckout = async (plano) => {
+    setError("");
+    setMessage("");
+    try {
+      const data = await api.assinaturas.checkout({ plano, provider: "mercadopago" });
+      setCheckout(data);
+      setMessage("Checkout Mercado Pago criado com seguranca para o BORDO.");
+    } catch (requestError) {
+      setError(requestError.message || "Nao foi possivel criar checkout");
+    }
+  };
+
+  const updateSubscription = async (empresaId, dados) => {
+    setError("");
+    setMessage("");
+    try {
+      const updated = await api.assinaturas.atualizarAdmin(empresaId, dados);
+      setSubscriptions((current) => current.map((item) => item.id === empresaId ? updated : item));
+      if (company?.id === empresaId) setCompany((current) => ({ ...current, ...updated }));
+      setMessage("Assinatura atualizada sem perda de dados.");
+    } catch (requestError) {
+      setError(requestError.message || "Nao foi possivel atualizar assinatura");
     }
   };
 
@@ -148,6 +192,66 @@ export default function MinhaEmpresa({ profile, onBack }) {
                 ))}
               </section>
             )}
+
+            <section style={{ ...cardStyle, alignItems: "stretch", display: "grid", gap: 12, marginTop: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <div>
+                  <div style={eyebrowStyle}>Comercial</div>
+                  <h2 style={{ fontFamily: fonts.display, color: C.white, fontSize: 18, marginTop: 3 }}>
+                    Assinatura e cobranca
+                  </h2>
+                  <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, marginTop: 4 }}>
+                    Status: {billingStatusLabels[company.assinatura?.billing_status] || company.assinatura?.billing_status || "Teste"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" onClick={() => createCheckout("profissional")} style={smallPrimaryButton}>Checkout Pro</button>
+                  <button type="button" onClick={() => createCheckout("empresa")} style={ghostButton}>Checkout Empresa</button>
+                </div>
+              </div>
+              {checkout && (
+                <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 }}>
+                  <div style={{ color: C.white, fontSize: 12, fontWeight: 800 }}>Link de checkout preparado</div>
+                  <input readOnly value={checkout.checkout_url} style={{ ...inputStyle, width: "100%", marginTop: 8 }} />
+                  <button type="button" onClick={() => { window.location.href = checkout.checkout_url; }} style={{ ...smallPrimaryButton, marginTop: 8 }}>Abrir Mercado Pago</button>
+                </div>
+              )}
+            </section>
+
+            {canManage && (
+              <section style={{ marginTop: 20 }}>
+                <div style={eyebrowStyle}>Painel interno</div>
+                <h2 style={{ fontFamily: fonts.display, color: C.white, fontSize: 19, marginTop: 3, marginBottom: 12 }}>
+                  Assinaturas
+                </h2>
+                {subscriptions.map((subscription) => (
+                  <article key={subscription.id} style={{ ...cardStyle, marginBottom: 10 }}>
+                    <div>
+                      <div style={{ color: C.white, fontSize: 14, fontWeight: 800 }}>{subscription.nome}</div>
+                      <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 11, marginTop: 3 }}>
+                        {subscription.slug} · {subscription.plano} · {billingStatusLabels[subscription.billing_status] || subscription.billing_status}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <button type="button" onClick={() => updateSubscription(subscription.id, { plano: "profissional", billing_status: "active", ativo: 1 })} style={ghostButton}>Ativar</button>
+                      <button type="button" onClick={() => updateSubscription(subscription.id, { billing_status: "past_due", ativo: 1 })} style={ghostButton}>Inadimplente</button>
+                      <button type="button" onClick={() => updateSubscription(subscription.id, { billing_status: "blocked", ativo: 1 })} style={ghostButton}>Bloquear</button>
+                    </div>
+                  </article>
+                ))}
+              </section>
+            )}
+
+            <section style={{ ...cardStyle, marginTop: 20 }}>
+              <div>
+                <div style={eyebrowStyle}>Legal</div>
+                <div style={{ color: C.white, fontWeight: 800, marginTop: 4 }}>Termos, privacidade e LGPD</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => onLegal?.("privacidade")} style={ghostButton}>Privacidade</button>
+                <button type="button" onClick={() => onLegal?.("termos")} style={ghostButton}>Termos</button>
+              </div>
+            </section>
 
             <section style={{ marginTop: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", marginBottom: 12 }}>
@@ -338,6 +442,16 @@ const smallPrimaryButton = {
   borderRadius: 10,
   background: C.aqua,
   color: C.white,
+  padding: "10px 14px",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const ghostButton = {
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 10,
+  background: "rgba(255,255,255,0.05)",
+  color: "rgba(255,255,255,0.72)",
   padding: "10px 14px",
   fontWeight: 700,
   cursor: "pointer",

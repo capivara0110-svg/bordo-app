@@ -1,19 +1,76 @@
 const API = import.meta.env.VITE_API_URL || "/api";
+const OFFLINE_QUEUE_KEY = "bordo_offline_queue";
+
+function readOfflineQueue() {
+  return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
+}
+
+function queueOfflineMutation(path, options) {
+  const queue = readOfflineQueue();
+  queue.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    path,
+    options,
+    criado_em: new Date().toISOString(),
+  });
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue.slice(-80)));
+}
+
+export async function syncOfflineQueue() {
+  if (!navigator.onLine) return { synced: 0, remaining: readOfflineQueue().length };
+  const queue = readOfflineQueue();
+  const remaining = [];
+  let synced = 0;
+
+  for (const item of queue) {
+    try {
+      await request(item.path, { ...item.options, skipOfflineQueue: true });
+      synced += 1;
+    } catch {
+      remaining.push(item);
+    }
+  }
+
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
+  return { synced, remaining: remaining.length };
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    syncOfflineQueue().catch(() => {});
+  });
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    });
+  }
+}
 
 // ─── CLIENTE HTTP ───────────────────────────────────────
 async function request(path, options = {}) {
   const token = localStorage.getItem("bordo_token");
+  const { skipOfflineQueue, ...fetchOptions } = options;
 
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
+    ...fetchOptions.headers,
   };
 
-  const res = await fetch(`${API}${path}`, {
-    ...options,
-    headers,
-  });
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, {
+      ...fetchOptions,
+      headers,
+    });
+  } catch (error) {
+    const method = String(fetchOptions.method || "GET").toUpperCase();
+    if (!skipOfflineQueue && method !== "GET") {
+      queueOfflineMutation(path, fetchOptions);
+      return { offline: true, queued: true };
+    }
+    throw error;
+  }
 
   const data = await res.json();
 
@@ -55,6 +112,20 @@ export const api = {
       request(`/empresa/membros/${id}/papel`, {
         method: "PUT",
         body: JSON.stringify({ papel }),
+      }),
+  },
+
+  assinaturas: {
+    checkout: (dados) =>
+      request("/assinaturas/checkout", {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
+    admin: () => request("/assinaturas/admin"),
+    atualizarAdmin: (empresaId, dados) =>
+      request(`/assinaturas/admin/${empresaId}`, {
+        method: "PUT",
+        body: JSON.stringify(dados),
       }),
   },
 
@@ -130,7 +201,9 @@ export const api = {
 
   embarcacoes: {
     listar: () => request("/embarcacoes"),
+    alertas: () => request("/embarcacoes/alertas"),
     historico: (id) => request(`/embarcacoes/${id}/historico`),
+    qrcode: (id) => request(`/embarcacoes/${id}/qrcode`),
     fotos: (id) => request(`/embarcacoes/${id}/fotos`),
     adicionarFoto: (id, dados) =>
       request(`/embarcacoes/${id}/fotos`, {
@@ -152,6 +225,7 @@ export const api = {
   // ─── ORDENS DE SERVIÇO ────────────────────────────────
   ordens: {
     listar: () => request("/ordens"),
+    modelos: () => request("/ordens/modelos"),
     criar: (dados) =>
       request("/ordens", {
         method: "POST",
@@ -183,6 +257,29 @@ export const api = {
         method: "POST",
         body: JSON.stringify(dados),
       }),
+    atualizarOrcamento: (id, dados) =>
+      request(`/ordens/${id}/orcamento`, {
+        method: "PUT",
+        body: JSON.stringify(dados),
+      }),
+    adicionarItemOrcamento: (id, dados) =>
+      request(`/ordens/${id}/orcamento/itens`, {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
+    removerItemOrcamento: (id, itemId) =>
+      request(`/ordens/${id}/orcamento/itens/${itemId}`, { method: "DELETE" }),
+    aprovarOrcamento: (id, dados) =>
+      request(`/ordens/${id}/orcamento/aprovacao`, {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
+    relatorio: (id) => request(`/ordens/${id}/relatorio`),
+    aceitarRelatorio: (id, dados) =>
+      request(`/ordens/${id}/relatorio/aceite`, {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
     toggleTarefa: (id, tarefaId) =>
       request(`/ordens/${id}/tarefa/${tarefaId}`, { method: "PUT" }),
   },
@@ -191,6 +288,19 @@ export const api = {
   notificacoes: {
     listar: () => request("/notificacoes"),
     ler: (id) => request(`/notificacoes/${id}/ler`, { method: "PUT" }),
+    criar: (dados) =>
+      request("/notificacoes", {
+        method: "POST",
+        body: JSON.stringify(dados),
+      }),
+  },
+
+  auditoria: {
+    listar: () => request("/auditoria"),
+  },
+
+  monitoramento: {
+    erros: () => request("/monitoramento/erros"),
   },
 
   // ─── BERÇOS ───────────────────────────────────────────

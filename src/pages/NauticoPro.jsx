@@ -19,6 +19,10 @@ export default function NauticoPro({ profile, onLogout }) {
   // Modal de criar
   const [showModal, setShowModal] = useState(null); // "diario" | "checklist" | null
   const [formData, setFormData] = useState({});
+  const [photoPanel, setPhotoPanel] = useState(null);
+  const [photoForm, setPhotoForm] = useState({ url: "", legenda: "", categoria: "geral" });
+  const [photoMessage, setPhotoMessage] = useState("");
+  const [photoSaving, setPhotoSaving] = useState(false);
 
   const tabs = fullProfile.tabs || [
     { id: "diario", icon: "📋", label: "Diário" },
@@ -85,6 +89,67 @@ export default function NauticoPro({ profile, onLogout }) {
       setShowModal(null);
       setFormData({});
     } catch (err) { alert(err.message); }
+  };
+
+  const openPhotoPanel = async (os) => {
+    setPhotoMessage("");
+    setPhotoForm({ url: "", legenda: "", categoria: "geral" });
+    try {
+      const fotos = await api.ordens.fotos(os.id);
+      setPhotoPanel({ item: os, fotos });
+    } catch (err) {
+      setPhotoMessage(err.message || "Nao foi possivel carregar as fotos");
+    }
+  };
+
+  const closePhotoPanel = () => {
+    setPhotoPanel(null);
+    setPhotoForm({ url: "", legenda: "", categoria: "geral" });
+    setPhotoMessage("");
+  };
+
+  const updatePhotoFile = (file) => {
+    setPhotoMessage("");
+    if (!file) {
+      setPhotoForm((current) => ({ ...current, url: "" }));
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setPhotoMessage("Selecione uma imagem valida.");
+      return;
+    }
+    if (file.size > 520000) {
+      setPhotoMessage("Use uma foto menor por enquanto. Limite aproximado: 500 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setPhotoForm((current) => ({ ...current, url: String(reader.result || "") }));
+    reader.onerror = () => setPhotoMessage("Nao foi possivel ler a foto.");
+    reader.readAsDataURL(file);
+  };
+
+  const savePhoto = async (event) => {
+    event.preventDefault();
+    if (!photoPanel) return;
+    if (!photoForm.url) {
+      setPhotoMessage("Selecione uma foto antes de salvar.");
+      return;
+    }
+    setPhotoSaving(true);
+    setPhotoMessage("");
+    try {
+      const saved = await api.ordens.adicionarFoto(photoPanel.item.id, photoForm);
+      setPhotoPanel((current) => ({ ...current, fotos: [saved, ...current.fotos] }));
+      setOrdens((current) => current.map((os) => (
+        os.id === photoPanel.item.id ? { ...os, fotos: Number(os.fotos || 0) + 1 } : os
+      )));
+      setPhotoForm({ url: "", legenda: "", categoria: "geral" });
+      setPhotoMessage("Foto salva com sucesso.");
+    } catch (err) {
+      setPhotoMessage(err.message || "Nao foi possivel salvar a foto");
+    } finally {
+      setPhotoSaving(false);
+    }
   };
 
   const UserBar = () => (
@@ -292,6 +357,18 @@ export default function NauticoPro({ profile, onLogout }) {
               <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Ordens</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{ordens.length} ordens</div>
             </div>
+            {photoPanel && (
+              <PhotoPanel
+                panel={photoPanel}
+                form={photoForm}
+                message={photoMessage}
+                saving={photoSaving}
+                onClose={closePhotoPanel}
+                onSubmit={savePhoto}
+                onFile={updatePhotoFile}
+                onChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
+              />
+            )}
             <div className="bordo-list-grid">
             {ordens.map(os => (
               <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
@@ -308,8 +385,48 @@ export default function NauticoPro({ profile, onLogout }) {
                   <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.prioridade}</span>
                   <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.abertura}</span>
                 </div>
+                <button type="button" onClick={() => openPhotoPanel(os)} style={{ marginTop: 10, width: "100%", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.72)", padding: "9px 12px", fontWeight: 700, cursor: "pointer" }}>
+                  Fotos ({Number(os.fotos || 0)})
+                </button>
               </div>
             ))}
+            </div>
+          </div>
+        );
+
+      case "fotos":
+        return (
+          <div className="bordo-page-body">
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Evidencias</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>Galeria por OS</div>
+            </div>
+            {photoPanel && (
+              <PhotoPanel
+                panel={photoPanel}
+                form={photoForm}
+                message={photoMessage}
+                saving={photoSaving}
+                onClose={closePhotoPanel}
+                onSubmit={savePhoto}
+                onFile={updatePhotoFile}
+                onChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
+              />
+            )}
+            <div className="bordo-list-grid">
+              {ordens.length === 0 && <div style={{ textAlign: "center", color: "rgba(255,255,255,0.25)", padding: 40 }}>Nenhuma OS para fotografar ainda</div>}
+              {ordens.map((os) => (
+                <button key={os.id} type="button" onClick={() => openPhotoPanel(os)} style={{ textAlign: "left", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 14, marginBottom: 10, cursor: "pointer" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: C.white }}>{os.codigo}</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 3 }}>{os.embarcacao}</div>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: C.aqua }}>{Number(os.fotos || 0)} foto(s)</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.54)", marginTop: 8 }}>{os.descricao || "Sem descricao"}</div>
+                </button>
+              ))}
             </div>
           </div>
         );
@@ -348,3 +465,98 @@ export default function NauticoPro({ profile, onLogout }) {
     </div>
   );
 }
+
+const photoCategories = [
+  ["geral", "Geral"],
+  ["antes", "Antes"],
+  ["durante", "Durante"],
+  ["depois", "Depois"],
+  ["documento", "Documento"],
+];
+
+function PhotoPanel({ panel, form, message, saving, onClose, onSubmit, onFile, onChange }) {
+  return (
+    <section style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 14, marginBottom: 14, display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+        <div>
+          <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>Fotos da {panel.item.codigo}</div>
+          <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 3 }}>{panel.fotos.length} foto(s) cadastrada(s)</div>
+        </div>
+        <button type="button" onClick={onClose} style={ghostButton}>Fechar</button>
+      </div>
+
+      {message && <div style={{ color: message.includes("sucesso") ? C.green : C.rust, background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 700 }}>{message}</div>}
+
+      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
+        <label style={fieldStyle}>
+          Foto
+          <input type="file" accept="image/*" onChange={(event) => onFile(event.target.files?.[0])} style={inputStyle} />
+        </label>
+        <label style={fieldStyle}>
+          Tipo de foto
+          <select value={form.categoria} onChange={(event) => onChange("categoria", event.target.value)} style={inputStyle}>
+            {photoCategories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label style={fieldStyle}>
+          Descricao curta
+          <input value={form.legenda} onChange={(event) => onChange("legenda", event.target.value)} style={inputStyle} placeholder="Ex.: casco antes da lavagem" />
+        </label>
+        {form.url && <img src={form.url} alt="Preview da foto" style={{ width: 140, height: 100, objectFit: "cover", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)" }} />}
+        <button type="submit" disabled={saving} style={primaryButton}>{saving ? "Salvando..." : "Salvar foto"}</button>
+      </form>
+
+      {panel.fotos.length === 0 && <div style={{ textAlign: "center", color: "rgba(255,255,255,0.25)", padding: 20 }}>Nenhuma foto anexada nesta OS</div>}
+      {panel.fotos.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
+          {panel.fotos.map((foto) => (
+            <div key={foto.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 8 }}>
+              <img src={foto.url} alt={foto.legenda || "Foto da OS"} style={{ width: "100%", height: 110, objectFit: "cover", borderRadius: 10 }} />
+              <div style={{ fontSize: 10, color: C.aqua, fontWeight: 800, textTransform: "uppercase", marginTop: 8 }}>{foto.categoria || "geral"}</div>
+              {foto.legenda && <div style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, marginTop: 5 }}>{foto.legenda}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const inputStyle = {
+  width: "100%",
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(255,255,255,0.08)",
+  color: C.white,
+  borderRadius: 10,
+  padding: "10px 11px",
+  outline: "none",
+  fontFamily: fonts.body,
+};
+
+const fieldStyle = {
+  display: "grid",
+  gap: 6,
+  color: "rgba(255,255,255,0.58)",
+  fontSize: 12,
+  fontWeight: 700,
+};
+
+const primaryButton = {
+  border: "none",
+  borderRadius: 10,
+  background: C.aqua,
+  color: C.white,
+  padding: "10px 14px",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const ghostButton = {
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 10,
+  background: "rgba(255,255,255,0.05)",
+  color: "rgba(255,255,255,0.72)",
+  padding: "9px 12px",
+  fontWeight: 700,
+  cursor: "pointer",
+};

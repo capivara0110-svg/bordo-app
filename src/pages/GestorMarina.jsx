@@ -5,6 +5,7 @@ import StatusBadge from "../components/StatusBadge.jsx";
 import Header from "../components/Header.jsx";
 
 const emptyOrder = {
+  modelo: "",
   cliente_id: "",
   embarcacao_id: "",
   embarcacao: "",
@@ -37,6 +38,8 @@ const emptyBoat = {
   modelo: "",
   tamanho: "",
   registro: "",
+  proxima_manutencao: "",
+  validade_documento: "",
   observacao: "",
 };
 
@@ -94,12 +97,31 @@ const photoCategories = [
   ["documento", "Documento"],
 ];
 
+const budgetStatusOptions = [
+  ["rascunho", "Rascunho"],
+  ["enviado", "Enviado"],
+  ["aprovado", "Aprovado"],
+  ["recusado", "Recusado"],
+];
+
+const budgetItemTypes = [
+  ["servico", "Servico"],
+  ["material", "Material usado"],
+  ["hora", "Horas trabalhadas"],
+  ["mao_obra", "Mao de obra"],
+  ["outro", "Outro"],
+];
+
 function dateKey(value) {
   return String(value || "").slice(0, 10);
 }
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export default function GestorMarina({ profile, onLogout, onCompany }) {
@@ -113,6 +135,10 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [clientes, setClientes] = useState([]);
   const [embarcacoes, setEmbarcacoes] = useState([]);
   const [agenda, setAgenda] = useState([]);
+  const [modelosOS, setModelosOS] = useState([]);
+  const [alertasOperacao, setAlertasOperacao] = useState([]);
+  const [auditoria, setAuditoria] = useState([]);
+  const [errosMonitoramento, setErrosMonitoramento] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [orderForm, setOrderForm] = useState(emptyOrder);
@@ -124,6 +150,8 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [orderSearch, setOrderSearch] = useState("");
   const [newTask, setNewTask] = useState({});
   const [executionDraft, setExecutionDraft] = useState({});
+  const [budgetDraft, setBudgetDraft] = useState({});
+  const [budgetMessage, setBudgetMessage] = useState({});
   const [clientForm, setClientForm] = useState(emptyClient);
   const [boatForm, setBoatForm] = useState(emptyBoat);
   const [teamForm, setTeamForm] = useState(emptyTeamMember);
@@ -141,12 +169,19 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [photoForm, setPhotoForm] = useState({ url: "", legenda: "", categoria: "geral" });
   const [photoMessage, setPhotoMessage] = useState("");
   const [photoSaving, setPhotoSaving] = useState(false);
+  const [qrPanel, setQrPanel] = useState(null);
+  const [reportPanel, setReportPanel] = useState(null);
+  const [reportMessage, setReportMessage] = useState("");
+  const [reportAcceptName, setReportAcceptName] = useState("");
+  const [notificationDraft, setNotificationDraft] = useState({ canal: "app", titulo: "", corpo: "", destinatario: "" });
+  const [operationMessage, setOperationMessage] = useState("");
 
   const tabs = [
     { id: "dashboard", icon: "📊", label: "Painel" },
     { id: "clientes", icon: "🧾", label: "Clientes" },
     { id: "embarcacoes", icon: "🛥️", label: "Barcos" },
     { id: "agenda", icon: "📅", label: "Agenda" },
+    { id: "operacao", icon: "🧭", label: "Operação" },
     { id: "equipe", icon: "👥", label: "Equipe" },
     { id: "ordens", icon: "🔧", label: "Ordens" },
     { id: "bercos", icon: "⚓", label: "Berços" },
@@ -157,7 +192,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       setLoading(true);
       setError("");
       try {
-        const [dash, ord, trip, ber, cli, emb, agd] = await Promise.all([
+        const [dash, ord, trip, ber, cli, emb, agd, modelos, alertas, logs, erros] = await Promise.all([
           api.dashboard.dados(),
           api.ordens.listar(),
           api.tripulacao.listar(),
@@ -165,6 +200,10 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
           api.clientes.listar(),
           api.embarcacoes.listar(),
           api.agenda.listar(),
+          api.ordens.modelos(),
+          api.embarcacoes.alertas(),
+          api.auditoria.listar(),
+          api.monitoramento.erros(),
         ]);
         setDashboard(dash);
         setOrdens(ord);
@@ -173,6 +212,10 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
         setClientes(cli);
         setEmbarcacoes(emb);
         setAgenda(agd);
+        setModelosOS(modelos);
+        setAlertasOperacao(alertas);
+        setAuditoria(logs);
+        setErrosMonitoramento(erros);
       } catch (err) {
         console.error("Erro ao carregar dashboard:", err);
         setError(err.message || "Nao foi possivel carregar o painel");
@@ -209,6 +252,58 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     setPhotoPanel(null);
     setPhotoForm({ url: "", legenda: "", categoria: "geral" });
     setPhotoMessage("");
+  };
+
+  const openReportPanel = async (os) => {
+    setReportMessage("");
+    setReportAcceptName(os.cliente || "");
+    try {
+      const relatorio = await api.ordens.relatorio(os.id);
+      setReportPanel(relatorio);
+    } catch (err) {
+      setReportMessage(err.message || "Nao foi possivel carregar o relatorio.");
+    }
+  };
+
+  const closeReportPanel = () => {
+    setReportPanel(null);
+    setReportMessage("");
+    setReportAcceptName("");
+  };
+
+  const acceptReport = async () => {
+    if (!reportPanel?.ordem) return;
+    try {
+      const relatorio = await api.ordens.aceitarRelatorio(reportPanel.ordem.id, {
+        aceito: true,
+        aceito_por: reportAcceptName,
+      });
+      setReportPanel(relatorio);
+      setOrdens((current) => current.map((os) => (
+        os.id === relatorio.ordem.id ? relatorio.ordem : os
+      )));
+      setReportMessage("Aceite registrado com sucesso.");
+    } catch (err) {
+      setReportMessage(err.message || "Nao foi possivel registrar o aceite.");
+    }
+  };
+
+  const printReport = () => {
+    window.print();
+  };
+
+  const shareReport = () => {
+    if (!reportPanel?.ordem) return;
+    const ordem = reportPanel.ordem;
+    const total = reportPanel.orcamento ? money(reportPanel.orcamento.total) : "";
+    const texto = [
+      `Relatorio da ${ordem.codigo} - ${ordem.embarcacao}`,
+      ordem.cliente ? `Cliente: ${ordem.cliente}` : "",
+      total ? `Total: ${total}` : "",
+      `Status: ${ordem.status}`,
+      window.location.href,
+    ].filter(Boolean).join("\n");
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
   };
 
   const updatePhotoFile = (file) => {
@@ -299,6 +394,17 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     setOrderMessage("");
   };
 
+  const selectOrderModel = (id) => {
+    const modelo = modelosOS.find((item) => item.id === id);
+    setOrderForm((current) => ({
+      ...current,
+      modelo: id,
+      tipo: modelo?.tipo || current.tipo,
+      tarefas: current.tarefas || (modelo?.tarefas || []).join("\n"),
+    }));
+    setOrderMessage("");
+  };
+
   const toggleOrderAuxiliar = (id) => {
     setOrderForm((current) => {
       const value = Number(id);
@@ -322,6 +428,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
 
   const startEditOrder = (order) => {
     setOrderForm({
+      modelo: "",
       cliente_id: order.cliente_id || "",
       embarcacao_id: order.embarcacao_id || "",
       embarcacao: order.embarcacao || "",
@@ -440,6 +547,98 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     }
   };
 
+  const updateBudgetDraft = (orderId, field, value) => {
+    setBudgetDraft((current) => ({
+      ...current,
+      [orderId]: {
+        tipo: "servico",
+        descricao: "",
+        funcao: "",
+        quantidade: 1,
+        unidade: "un",
+        valor_unitario: "",
+        desconto: "",
+        acrescimo: "",
+        aprovado_por: "",
+        ...(current[orderId] || {}),
+        [field]: value,
+      },
+    }));
+    setBudgetMessage((current) => ({ ...current, [orderId]: "" }));
+  };
+
+  const updateOrderBudgetState = (orderId, orcamento) => {
+    setOrdens((current) => current.map((item) => (
+      item.id === orderId ? { ...item, orcamento } : item
+    )));
+  };
+
+  const saveBudgetItem = async (orderId) => {
+    const draft = budgetDraft[orderId] || {};
+    if (!String(draft.descricao || "").trim()) {
+      setBudgetMessage((current) => ({ ...current, [orderId]: "Informe a descricao do item." }));
+      return;
+    }
+    try {
+      const orcamento = await api.ordens.adicionarItemOrcamento(orderId, {
+        tipo: draft.tipo || "servico",
+        descricao: draft.descricao,
+        funcao: draft.funcao,
+        quantidade: draft.quantidade,
+        unidade: draft.unidade,
+        valor_unitario: draft.valor_unitario,
+      });
+      updateOrderBudgetState(orderId, orcamento);
+      setBudgetDraft((current) => ({
+        ...current,
+        [orderId]: { ...(current[orderId] || {}), tipo: "servico", descricao: "", funcao: "", quantidade: 1, unidade: "un", valor_unitario: "" },
+      }));
+      setBudgetMessage((current) => ({ ...current, [orderId]: "Item adicionado ao orcamento." }));
+    } catch (err) {
+      setBudgetMessage((current) => ({ ...current, [orderId]: err.message || "Nao foi possivel salvar o item." }));
+    }
+  };
+
+  const saveBudgetAdjustments = async (orderId, status = null) => {
+    const draft = budgetDraft[orderId] || {};
+    const order = ordens.find((item) => item.id === orderId);
+    try {
+      const orcamento = await api.ordens.atualizarOrcamento(orderId, {
+        status: status || order?.orcamento?.status || "rascunho",
+        desconto: draft.desconto !== "" && draft.desconto != null ? draft.desconto : order?.orcamento?.desconto,
+        acrescimo: draft.acrescimo !== "" && draft.acrescimo != null ? draft.acrescimo : order?.orcamento?.acrescimo,
+      });
+      updateOrderBudgetState(orderId, orcamento);
+      setBudgetMessage((current) => ({ ...current, [orderId]: "Orcamento atualizado." }));
+    } catch (err) {
+      setBudgetMessage((current) => ({ ...current, [orderId]: err.message || "Nao foi possivel atualizar o orcamento." }));
+    }
+  };
+
+  const removeBudgetItem = async (orderId, itemId) => {
+    try {
+      const orcamento = await api.ordens.removerItemOrcamento(orderId, itemId);
+      updateOrderBudgetState(orderId, orcamento);
+      setBudgetMessage((current) => ({ ...current, [orderId]: "Item removido." }));
+    } catch (err) {
+      setBudgetMessage((current) => ({ ...current, [orderId]: err.message || "Nao foi possivel remover o item." }));
+    }
+  };
+
+  const approveBudget = async (orderId, aprovado) => {
+    const draft = budgetDraft[orderId] || {};
+    try {
+      const orcamento = await api.ordens.aprovarOrcamento(orderId, {
+        aprovado,
+        aprovado_por: draft.aprovado_por,
+      });
+      updateOrderBudgetState(orderId, orcamento);
+      setBudgetMessage((current) => ({ ...current, [orderId]: aprovado ? "Aprovacao registrada." : "Recusa registrada." }));
+    } catch (err) {
+      setBudgetMessage((current) => ({ ...current, [orderId]: err.message || "Nao foi possivel registrar a aprovacao." }));
+    }
+  };
+
   const updateClientForm = (field, value) => {
     setClientForm((current) => ({ ...current, [field]: value }));
     setClientMessage("");
@@ -509,6 +708,8 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       modelo: embarcacao.modelo || "",
       tamanho: embarcacao.tamanho || "",
       registro: embarcacao.registro || "",
+      proxima_manutencao: embarcacao.proxima_manutencao || "",
+      validade_documento: embarcacao.validade_documento || "",
       observacao: embarcacao.observacao || "",
     });
     setEditingBoatId(embarcacao.id);
@@ -518,6 +719,37 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const clearBoatForm = () => {
     setBoatForm(emptyBoat);
     setEditingBoatId(null);
+  };
+
+  const openQrPanel = async (embarcacao) => {
+    setBoatMessage("");
+    try {
+      setQrPanel(await api.embarcacoes.qrcode(embarcacao.id));
+    } catch (err) {
+      setBoatMessage(err.message || "Nao foi possivel gerar o QR Code");
+    }
+  };
+
+  const saveOperationalNotification = async () => {
+    if (!notificationDraft.titulo.trim()) {
+      setOperationMessage("Informe o titulo da notificacao.");
+      return;
+    }
+    try {
+      await api.notificacoes.criar({
+        tipo: notificationDraft.canal === "app" ? "info" : "externo",
+        icone: notificationDraft.canal === "whatsapp" ? "W" : notificationDraft.canal === "email" ? "@" : "!",
+        titulo: notificationDraft.titulo,
+        corpo: notificationDraft.corpo,
+        canal: notificationDraft.canal,
+        destinatario: notificationDraft.destinatario,
+        categoria: "operacao",
+      });
+      setNotificationDraft({ canal: "app", titulo: "", corpo: "", destinatario: "" });
+      setOperationMessage("Notificacao registrada. Email/WhatsApp ficam pendentes ate integrar o provedor.");
+    } catch (err) {
+      setOperationMessage(err.message || "Nao foi possivel registrar a notificacao.");
+    }
   };
 
   const saveBoat = async (event) => {
@@ -659,7 +891,10 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
         const hoje = todayKey();
         const agendaFiltrada = agendaResponsavel === "todos"
           ? agenda
-          : agenda.filter((os) => os.responsavel === agendaResponsavel);
+          : agenda.filter((os) => (
+            String(os.responsavel_id || "") === String(agendaResponsavel)
+            || (os.auxiliares || []).some((auxiliar) => String(auxiliar.membro_id) === String(agendaResponsavel))
+          ));
         const atrasadas = agendaFiltrada.filter((os) => dateKey(os.previsao) < hoje && os.status !== "concluida");
         const hojeAgenda = agendaFiltrada.filter((os) => dateKey(os.previsao) === hoje && os.status !== "concluida");
         const proximas = agendaFiltrada.filter((os) => dateKey(os.previsao) > hoje && os.status !== "concluida");
@@ -679,7 +914,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
               <Field label="Filtrar por responsavel">
                 <select value={agendaResponsavel} onChange={(event) => setAgendaResponsavel(event.target.value)} style={inputStyle}>
                   <option value="todos">Todos os responsaveis</option>
-                  {equipe.map((member) => <option key={member.id} value={member.nome}>{member.nome} - {member.funcao || member.cargo}</option>)}
+                  {equipe.map((member) => <option key={member.id} value={member.id}>{member.nome} - {member.funcao || member.cargo}</option>)}
                 </select>
               </Field>
             </div>
@@ -705,6 +940,84 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
           </div>
         );
       }
+
+      case "operacao":
+        return (
+          <div className="bordo-page-body">
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Operacao avancada</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>Modelos, alertas e auditoria</div>
+            </div>
+
+            {operationMessage && <InlineMessage tone={operationMessage.includes("Nao") || operationMessage.includes("Informe") ? "error" : "success"}>{operationMessage}</InlineMessage>}
+
+            <section style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+              <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>Modelos de OS e checklist</div>
+              <div className="bordo-list-grid">
+                {modelosOS.map((modelo) => (
+                  <div key={modelo.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 }}>
+                    <div style={{ color: C.white, fontWeight: 800, fontSize: 13 }}>{modelo.label}</div>
+                    <div style={{ display: "grid", gap: 5, marginTop: 8 }}>
+                      {modelo.tarefas.map((tarefa) => <span key={tarefa} style={{ color: "rgba(255,255,255,0.58)", fontSize: 11 }}>- {tarefa}</span>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+              <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>Alertas preventivos</div>
+              {alertasOperacao.length === 0 && <StateMessage title="Sem alertas preventivos" body="Datas de manutencao e documentos dentro da margem." compact />}
+              {alertasOperacao.map((alerta) => (
+                <div key={`${alerta.embarcacao_id}-${alerta.tipo}`} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12, borderLeft: `3px solid ${alerta.status === "vencido" ? C.rust : alerta.status === "urgente" ? C.gold : C.aqua}` }}>
+                  <div style={{ color: C.white, fontWeight: 800, fontSize: 13 }}>{alerta.titulo} · {alerta.embarcacao}</div>
+                  <div style={{ color: "rgba(255,255,255,0.58)", fontSize: 12, marginTop: 4 }}>
+                    {alerta.data} · {alerta.dias < 0 ? `${Math.abs(alerta.dias)} dia(s) vencido` : `vence em ${alerta.dias} dia(s)`}
+                  </div>
+                </div>
+              ))}
+            </section>
+
+            <section style={{ ...panelStyle, display: "grid", gap: 10, marginBottom: 16 }}>
+              <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>Notificacao operacional</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
+                <select value={notificationDraft.canal} onChange={(event) => setNotificationDraft((current) => ({ ...current, canal: event.target.value }))} style={inputStyle}>
+                  <option value="app">App</option>
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+                <input value={notificationDraft.destinatario} onChange={(event) => setNotificationDraft((current) => ({ ...current, destinatario: event.target.value }))} placeholder="Destino" style={inputStyle} />
+              </div>
+              <input value={notificationDraft.titulo} onChange={(event) => setNotificationDraft((current) => ({ ...current, titulo: event.target.value }))} placeholder="Titulo" style={inputStyle} />
+              <textarea value={notificationDraft.corpo} onChange={(event) => setNotificationDraft((current) => ({ ...current, corpo: event.target.value }))} placeholder="Mensagem" style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
+              <button type="button" onClick={saveOperationalNotification} style={primarySmallButton}>Registrar notificacao</button>
+            </section>
+
+            <section style={{ ...panelStyle, display: "grid", gap: 10, marginBottom: 16 }}>
+              <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>Erros monitorados</div>
+              {errosMonitoramento.length === 0 && <StateMessage title="Sem erros recentes" body="Falhas capturadas pela API aparecem aqui." compact />}
+              {errosMonitoramento.slice(0, 10).map((erro) => (
+                <div key={erro.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10, borderLeft: `3px solid ${C.rust}` }}>
+                  <div style={{ color: C.white, fontSize: 12, fontWeight: 800 }}>{erro.status || 500} · {erro.method} {erro.path}</div>
+                  <div style={{ color: "rgba(255,255,255,0.58)", fontSize: 12, marginTop: 3 }}>{erro.mensagem}</div>
+                  <div style={{ color: "rgba(255,255,255,0.32)", fontSize: 10, marginTop: 4 }}>ID {erro.request_id || "-"} · {String(erro.criado_em || "").slice(0, 16).replace("T", " ")}</div>
+                </div>
+              ))}
+            </section>
+
+            <section style={{ ...panelStyle, display: "grid", gap: 10 }}>
+              <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>Auditoria recente</div>
+              {auditoria.length === 0 && <StateMessage title="Sem auditoria ainda" body="Alteracoes importantes aparecem aqui." compact />}
+              {auditoria.slice(0, 20).map((log) => (
+                <div key={log.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10 }}>
+                  <div style={{ color: C.white, fontSize: 12, fontWeight: 800 }}>{log.acao} · {log.entidade}</div>
+                  <div style={{ color: "rgba(255,255,255,0.58)", fontSize: 12, marginTop: 3 }}>{log.resumo}</div>
+                  <div style={{ color: "rgba(255,255,255,0.32)", fontSize: 10, marginTop: 4 }}>{log.usuario_nome || "Sistema"} · {String(log.criado_em || "").slice(0, 16).replace("T", " ")}</div>
+                </div>
+              ))}
+            </section>
+          </div>
+        );
 
       case "clientes":
         return (
@@ -827,6 +1140,12 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                 <Field label="Registro">
                   <input value={boatForm.registro} onChange={(event) => updateBoatForm("registro", event.target.value)} style={inputStyle} />
                 </Field>
+                <Field label="Proxima manutencao">
+                  <input type="date" value={boatForm.proxima_manutencao} onChange={(event) => updateBoatForm("proxima_manutencao", event.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Validade documento">
+                  <input type="date" value={boatForm.validade_documento} onChange={(event) => updateBoatForm("validade_documento", event.target.value)} style={inputStyle} />
+                </Field>
               </div>
               <Field label="Observacao">
                 <textarea value={boatForm.observacao} onChange={(event) => updateBoatForm("observacao", event.target.value)} style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
@@ -845,6 +1164,17 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                 onFile={updatePhotoFile}
                 onChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
               />
+            )}
+
+            {qrPanel && (
+              <section style={{ ...panelStyle, display: "grid", gap: 10, marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                  <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>QR Code da embarcacao</div>
+                  <button type="button" onClick={() => setQrPanel(null)} style={ghostButton}>Fechar</button>
+                </div>
+                <div style={{ background: C.white, borderRadius: 10, padding: 12, width: 250, maxWidth: "100%" }} dangerouslySetInnerHTML={{ __html: qrPanel.svg }} />
+                <input readOnly value={qrPanel.url} style={inputStyle} />
+              </section>
             )}
 
             {boatHistory && (
@@ -867,6 +1197,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                       <button type="button" onClick={() => openPhotoPanel("embarcacao", embarcacao)} style={ghostButton}>Fotos</button>
+                      <button type="button" onClick={() => openQrPanel(embarcacao)} style={ghostButton}>QR</button>
                       <button type="button" onClick={() => openBoatHistory(embarcacao)} style={ghostButton}>
                         {historyLoading === `embarcacao-${embarcacao.id}` ? "Abrindo..." : "Historico"}
                       </button>
@@ -999,6 +1330,19 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
               />
             )}
 
+            {reportPanel && (
+              <ReportPanel
+                report={reportPanel}
+                message={reportMessage}
+                acceptName={reportAcceptName}
+                onAcceptName={setReportAcceptName}
+                onAccept={acceptReport}
+                onPrint={printReport}
+                onShare={shareReport}
+                onClose={closeReportPanel}
+              />
+            )}
+
             {showOrderForm && (
               <form onSubmit={saveOrder} style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
@@ -1021,6 +1365,12 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                           {embarcacao.nome}{embarcacao.cliente_nome ? ` - ${embarcacao.cliente_nome}` : ""}
                         </option>
                       ))}
+                    </select>
+                  </Field>
+                  <Field label="Modelo de OS">
+                    <select value={orderForm.modelo || ""} onChange={(event) => selectOrderModel(event.target.value)} style={inputStyle}>
+                      <option value="">Sem modelo</option>
+                      {modelosOS.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.label}</option>)}
                     </select>
                   </Field>
                   <Field label="Cliente cadastrado">
@@ -1128,6 +1478,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <button type="button" onClick={() => openPhotoPanel("ordem", os)} style={ghostButton}>Fotos ({Number(os.fotos || 0)})</button>
                   <button type="button" onClick={() => startEditOrder(os)} style={ghostButton}>Editar</button>
                 </div>
+                <button type="button" onClick={() => openReportPanel(os)} style={{ ...ghostButton, width: "100%", marginTop: 8 }}>Relatorio da OS</button>
                 <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
                     <span>Tarefas</span>
@@ -1159,6 +1510,16 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     <button type="button" onClick={() => addOrderTask(os.id)} style={ghostButton}>Adicionar</button>
                   </div>
                 </div>
+                <BudgetPanel
+                  os={os}
+                  draft={budgetDraft[os.id] || {}}
+                  message={budgetMessage[os.id]}
+                  onDraft={(field, value) => updateBudgetDraft(os.id, field, value)}
+                  onAddItem={() => saveBudgetItem(os.id)}
+                  onSaveAdjustments={(status) => saveBudgetAdjustments(os.id, status)}
+                  onRemoveItem={(itemId) => removeBudgetItem(os.id, itemId)}
+                  onApprove={(aprovado) => approveBudget(os.id, aprovado)}
+                />
                 <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
                   <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>Execucao</div>
                   <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 180px) 1fr auto", gap: 8, alignItems: "center" }}>
@@ -1317,6 +1678,234 @@ function InlineMessage({ tone, children }) {
       fontSize: 12,
     }}>
       {children}
+    </div>
+  );
+}
+
+function BudgetPanel({ os, draft, message, onDraft, onAddItem, onSaveAdjustments, onRemoveItem, onApprove }) {
+  const orcamento = os.orcamento || { status: "rascunho", itens: [], subtotal: 0, desconto: 0, acrescimo: 0, total: 0 };
+  const statusLabel = budgetStatusOptions.find(([value]) => value === orcamento.status)?.[1] || "Rascunho";
+
+  return (
+    <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginBottom: 8 }}>
+        <div>
+          <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 800 }}>Orcamento e financeiro</div>
+          <div style={{ color: C.white, fontFamily: fonts.display, fontSize: 18, fontWeight: 900, marginTop: 2 }}>{money(orcamento.total)}</div>
+        </div>
+        <span style={{ ...tagStyle, color: orcamento.status === "aprovado" ? C.green : orcamento.status === "recusado" ? C.rust : C.aqua }}>
+          {statusLabel}
+        </span>
+      </div>
+
+      {message && <InlineMessage tone={message.includes("Nao") || message.includes("Informe") ? "error" : "success"}>{message}</InlineMessage>}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 10 }}>
+        <div style={miniMetricStyle}><span>Subtotal</span><strong>{money(orcamento.subtotal)}</strong></div>
+        <div style={miniMetricStyle}><span>Desconto</span><strong>{money(orcamento.desconto)}</strong></div>
+        <div style={miniMetricStyle}><span>Acrescimo</span><strong>{money(orcamento.acrescimo)}</strong></div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(120px, 150px) 1fr", gap: 8, marginBottom: 8 }}>
+        <select value={draft.tipo || "servico"} onChange={(event) => onDraft("tipo", event.target.value)} style={inputStyle}>
+          {budgetItemTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <input value={draft.descricao || ""} onChange={(event) => onDraft("descricao", event.target.value)} placeholder="Item, material ou mao de obra" style={inputStyle} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, alignItems: "center" }}>
+        <input value={draft.funcao || ""} onChange={(event) => onDraft("funcao", event.target.value)} placeholder="Funcao" style={inputStyle} />
+        <input type="number" min="0" step="0.25" value={draft.quantidade ?? 1} onChange={(event) => onDraft("quantidade", event.target.value)} placeholder="Qtd" style={inputStyle} />
+        <input value={draft.unidade || "un"} onChange={(event) => onDraft("unidade", event.target.value)} placeholder="Un" style={inputStyle} />
+        <input type="number" min="0" step="0.01" value={draft.valor_unitario || ""} onChange={(event) => onDraft("valor_unitario", event.target.value)} placeholder="Valor" style={inputStyle} />
+        <button type="button" onClick={onAddItem} style={ghostButton}>Adicionar</button>
+      </div>
+
+      {(orcamento.itens || []).length > 0 && (
+        <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+          {(orcamento.itens || []).map((item) => (
+            <div key={item.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <div>
+                  <div style={{ color: C.white, fontSize: 12, fontWeight: 800 }}>{item.descricao}</div>
+                  <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, marginTop: 3 }}>
+                    {budgetItemTypes.find(([value]) => value === item.tipo)?.[1] || item.tipo}
+                    {item.funcao ? ` · ${item.funcao}` : ""} · {Number(item.quantidade)} {item.unidade} x {money(item.valor_unitario)}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ color: C.aqua, fontSize: 12, fontWeight: 900 }}>{money(item.total)}</div>
+                  <button type="button" onClick={() => onRemoveItem(item.id)} style={{ ...ghostButton, padding: "5px 8px", marginTop: 5, fontSize: 10 }}>Remover</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr minmax(130px, auto)", gap: 8, marginTop: 10, alignItems: "center" }}>
+        <input type="number" min="0" step="0.01" value={draft.desconto ?? orcamento.desconto ?? ""} onChange={(event) => onDraft("desconto", event.target.value)} placeholder="Desconto" style={inputStyle} />
+        <input type="number" min="0" step="0.01" value={draft.acrescimo ?? orcamento.acrescimo ?? ""} onChange={(event) => onDraft("acrescimo", event.target.value)} placeholder="Acrescimo" style={inputStyle} />
+        <select value={orcamento.status || "rascunho"} onChange={(event) => onSaveAdjustments(event.target.value)} style={inputStyle}>
+          {budgetStatusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginTop: 8, alignItems: "center" }}>
+        <input value={draft.aprovado_por || ""} onChange={(event) => onDraft("aprovado_por", event.target.value)} placeholder="Aprovado por cliente/responsavel" style={inputStyle} />
+        <button type="button" onClick={() => onApprove(true)} style={ghostButton}>Aprovar</button>
+        <button type="button" onClick={() => onApprove(false)} style={ghostButton}>Recusar</button>
+      </div>
+    </div>
+  );
+}
+
+function ReportPanel({ report, message, acceptName, onAcceptName, onAccept, onPrint, onShare, onClose }) {
+  const { ordem, cliente, embarcacao, tarefas, fotos_por_tipo: fotosPorTipo, orcamento } = report;
+  const taskDone = tarefas.filter((item) => Number(item.done)).length;
+
+  return (
+    <section className="bordo-report-panel" style={{ ...panelStyle, display: "grid", gap: 14, marginBottom: 16 }}>
+      <div className="bordo-report-actions" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 900, fontSize: 20 }}>Relatorio {ordem.codigo}</div>
+          <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, marginTop: 4 }}>{ordem.embarcacao} · {ordem.cliente || "Cliente nao informado"}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" onClick={onPrint} style={ghostButton}>PDF</button>
+          <button type="button" onClick={onShare} style={ghostButton}>WhatsApp</button>
+          <button type="button" onClick={onClose} style={ghostButton}>Fechar</button>
+        </div>
+      </div>
+
+      {message && <InlineMessage tone={message.includes("sucesso") ? "success" : "error"}>{message}</InlineMessage>}
+
+      <div className="bordo-report-sheet" style={{ background: "#ffffff", color: "#162033", borderRadius: 12, padding: 18, display: "grid", gap: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, borderBottom: "1px solid #d9e1ea", paddingBottom: 12 }}>
+          <div>
+            <div style={{ fontFamily: fonts.display, fontWeight: 900, fontSize: 24, color: "#0A2540" }}>BORDO.</div>
+            <div style={{ fontSize: 12, color: "#637083" }}>Relatorio de ordem de servico</div>
+          </div>
+          <div style={{ textAlign: "right", fontSize: 12, color: "#637083" }}>
+            <strong style={{ color: "#0A2540" }}>{ordem.codigo}</strong><br />
+            Status: {ordem.status}<br />
+            Previsao: {ordem.previsao || "-"}
+          </div>
+        </div>
+
+        <ReportGrid>
+          <ReportBox title="Cliente" rows={[
+            ["Nome", cliente.nome || ordem.cliente || "-"],
+            ["Documento", cliente.documento || "-"],
+            ["Telefone", cliente.telefone || "-"],
+            ["Email", cliente.email || "-"],
+          ]} />
+          <ReportBox title="Embarcacao" rows={[
+            ["Nome", embarcacao.nome || ordem.embarcacao || "-"],
+            ["Tipo", embarcacao.tipo || "-"],
+            ["Marca/modelo", [embarcacao.marca, embarcacao.modelo].filter(Boolean).join(" ") || "-"],
+            ["Registro", embarcacao.registro || "-"],
+          ]} />
+        </ReportGrid>
+
+        <div>
+          <h3 style={reportTitleStyle}>Servico</h3>
+          <p style={{ fontSize: 13, lineHeight: 1.5 }}>{ordem.descricao || "Sem descricao informada."}</p>
+          <div style={{ marginTop: 8, fontSize: 12, color: "#637083" }}>
+            Responsavel: {ordem.responsavel || "-"} · Tarefas concluidas: {taskDone}/{tarefas.length}
+          </div>
+        </div>
+
+        <div>
+          <h3 style={reportTitleStyle}>Tarefas</h3>
+          <div style={{ display: "grid", gap: 6 }}>
+            {tarefas.length === 0 && <span style={reportMutedStyle}>Nenhuma tarefa cadastrada.</span>}
+            {tarefas.map((item) => (
+              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid #edf1f5", paddingBottom: 5, fontSize: 12 }}>
+                <span>{item.tarefa}</span>
+                <strong>{Number(item.done) ? "Concluida" : "Pendente"}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <ReportPhotos title="Fotos antes" fotos={fotosPorTipo.antes} />
+        <ReportPhotos title="Fotos depois" fotos={fotosPorTipo.depois} />
+        <ReportPhotos title="Outras fotos e documentos" fotos={[...fotosPorTipo.durante, ...fotosPorTipo.documento, ...fotosPorTipo.geral]} />
+
+        <div>
+          <h3 style={reportTitleStyle}>Orcamento</h3>
+          <div style={{ display: "grid", gap: 6 }}>
+            {(orcamento?.itens || []).length === 0 && <span style={reportMutedStyle}>Nenhum item financeiro cadastrado.</span>}
+            {(orcamento?.itens || []).map((item) => (
+              <div key={item.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, borderBottom: "1px solid #edf1f5", paddingBottom: 5, fontSize: 12 }}>
+                <span>{item.descricao} · {Number(item.quantidade)} {item.unidade}</span>
+                <strong>{money(item.total)}</strong>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", justifyContent: "end", gap: 4, marginTop: 10, fontSize: 12 }}>
+            <span>Subtotal: <strong>{money(orcamento?.subtotal)}</strong></span>
+            <span>Desconto: <strong>{money(orcamento?.desconto)}</strong></span>
+            <span>Acrescimo: <strong>{money(orcamento?.acrescimo)}</strong></span>
+            <span style={{ fontSize: 15 }}>Total: <strong>{money(orcamento?.total)}</strong></span>
+          </div>
+        </div>
+
+        <div style={{ border: "1px solid #d9e1ea", borderRadius: 10, padding: 12 }}>
+          <h3 style={reportTitleStyle}>Aceite do cliente</h3>
+          {Number(ordem.relatorio_aceito) ? (
+            <div style={{ fontSize: 13 }}>Aceito por <strong>{ordem.relatorio_aceito_por || cliente.nome || ordem.cliente}</strong> em {String(ordem.relatorio_aceito_em || "").slice(0, 16).replace("T", " ")}</div>
+          ) : (
+            <span style={reportMutedStyle}>Aguardando aceite do cliente.</span>
+          )}
+          <div style={{ marginTop: 26, borderTop: "1px solid #162033", width: 260, paddingTop: 6, fontSize: 12 }}>
+            Assinatura / aceite
+          </div>
+        </div>
+      </div>
+
+      <div className="bordo-report-actions" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+        <input value={acceptName} onChange={(event) => onAcceptName(event.target.value)} placeholder="Nome de quem aceitou" style={inputStyle} />
+        <button type="button" onClick={onAccept} style={primarySmallButton}>Registrar aceite</button>
+      </div>
+    </section>
+  );
+}
+
+function ReportGrid({ children }) {
+  return <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>{children}</div>;
+}
+
+function ReportBox({ title, rows }) {
+  return (
+    <div style={{ border: "1px solid #d9e1ea", borderRadius: 10, padding: 12 }}>
+      <h3 style={reportTitleStyle}>{title}</h3>
+      <div style={{ display: "grid", gap: 5 }}>
+        {rows.map(([label, value]) => (
+          <div key={label} style={{ display: "grid", gridTemplateColumns: "92px 1fr", gap: 8, fontSize: 12 }}>
+            <span style={{ color: "#637083" }}>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReportPhotos({ title, fotos }) {
+  return (
+    <div>
+      <h3 style={reportTitleStyle}>{title}</h3>
+      {fotos.length === 0 && <span style={reportMutedStyle}>Nenhuma foto nesta categoria.</span>}
+      {fotos.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+          {fotos.map((foto) => (
+            <figure key={foto.id} style={{ margin: 0, border: "1px solid #d9e1ea", borderRadius: 10, overflow: "hidden" }}>
+              <img src={foto.url} alt={foto.legenda || title} style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }} />
+              <figcaption style={{ padding: 8, fontSize: 11, color: "#637083" }}>{foto.legenda || foto.categoria || "Foto"}</figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1500,4 +2089,27 @@ const tagStyle = {
   borderRadius: 5,
   padding: "2px 7px",
   color: "rgba(255,255,255,0.5)",
+};
+
+const miniMetricStyle = {
+  background: "rgba(255,255,255,0.05)",
+  borderRadius: 10,
+  padding: 10,
+  display: "grid",
+  gap: 4,
+  color: "rgba(255,255,255,0.45)",
+  fontSize: 11,
+};
+
+const reportTitleStyle = {
+  margin: "0 0 8px",
+  color: "#0A2540",
+  fontFamily: fonts.display,
+  fontSize: 14,
+  fontWeight: 900,
+};
+
+const reportMutedStyle = {
+  color: "#637083",
+  fontSize: 12,
 };

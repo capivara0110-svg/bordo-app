@@ -9,5 +9,6 @@ dist/
 server/*.db
 server/*.db-shm
 server/*.db-wal
+server/backups/
 server/idx_*
 server/*_tmp.js

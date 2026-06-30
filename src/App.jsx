@@ -9,6 +9,7 @@ import GestorMarina from "./pages/GestorMarina.jsx";
 import Notificacoes from "./pages/Notificacoes.jsx";
 import TelasSuporte from "./pages/TelasSuporte.jsx";
 import MinhaEmpresa from "./pages/MinhaEmpresa.jsx";
+import Legal from "./pages/Legal.jsx";
 
 function buildProfile(user) {
   const perfilId = ["marinheiro", "marinharia", "tecnico", "gestor"].includes(user.perfil)
@@ -160,6 +161,28 @@ export default function App() {
           }
           .bordo-desktop-only { display: block; }
         }
+
+        @media print {
+          body { background: #ffffff !important; }
+          body * { visibility: hidden !important; }
+          .bordo-report-panel, .bordo-report-panel * { visibility: visible !important; }
+          .bordo-report-panel {
+            position: absolute !important;
+            inset: 0 auto auto 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            background: #ffffff !important;
+            box-shadow: none !important;
+          }
+          .bordo-report-actions { display: none !important; }
+          .bordo-report-sheet {
+            border-radius: 0 !important;
+            padding: 24px !important;
+            color: #162033 !important;
+          }
+        }
       `}</style>
 
       {screen === "landing" && <Landing onStart={() => navigate("login")} />}
@@ -181,7 +204,17 @@ export default function App() {
         <TelasSuporte onBack={() => navigate("landing")} />
       )}
       {screen === "empresa" && profile && (
-        <MinhaEmpresa profile={profile} onBack={() => navigate("home")} />
+        <MinhaEmpresa
+          profile={profile}
+          onBack={() => navigate("home")}
+          onLegal={(type) => navigate(type === "termos" ? "termos" : "privacidade")}
+        />
+      )}
+      {screen === "privacidade" && (
+        <Legal type="privacidade" onBack={() => navigate(profile ? "home" : "landing")} />
+      )}
+      {screen === "termos" && (
+        <Legal type="termos" onBack={() => navigate(profile ? "home" : "landing")} />
       )}
     </div>
   );

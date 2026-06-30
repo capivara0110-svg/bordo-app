@@ -57,7 +57,10 @@ function isExpired(empresa) {
 
 async function getEmpresa(empresaId) {
   return db.prepare(
-    `SELECT id, nome, slug, plano, ativo, trial_termina_em, criado_em
+    `SELECT id, nome, slug, plano, ativo, trial_termina_em,
+            billing_status, billing_provider, provider_customer_id,
+            provider_subscription_id, current_period_end, inadimplente_em,
+            criado_em
      FROM empresas
      WHERE id = ?`,
   ).get(empresaId);
@@ -94,13 +97,19 @@ async function getResumoPlano(empresaId) {
   const limites = getPlano(empresa.plano);
   const uso = await getUso(empresaId);
   const expirado = isExpired(empresa);
-  const ativo = Boolean(Number(empresa.ativo)) && !expirado;
+  const inadimplente = ["past_due", "unpaid", "canceled", "blocked"].includes(empresa.billing_status);
+  const ativo = Boolean(Number(empresa.ativo)) && !expirado && !inadimplente;
 
   return {
     plano: empresa.plano,
     nome: limites.nome,
     ativo,
     expirado,
+    inadimplente,
+    billing_status: empresa.billing_status || (empresa.plano === "trial" ? "trialing" : "active"),
+    billing_provider: empresa.billing_provider,
+    current_period_end: empresa.current_period_end,
+    inadimplente_em: empresa.inadimplente_em,
     trial_termina_em: empresa.trial_termina_em,
     limites: {
       usuarios: limites.usuarios,

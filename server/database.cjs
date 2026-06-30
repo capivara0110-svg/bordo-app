@@ -87,6 +87,9 @@ async function createSchema() {
       id ${id}, nome TEXT NOT NULL, slug TEXT UNIQUE NOT NULL,
       plano TEXT NOT NULL DEFAULT 'trial', ativo INTEGER NOT NULL DEFAULT 1,
       trial_termina_em TIMESTAMP,
+      billing_status TEXT DEFAULT 'trialing', billing_provider TEXT DEFAULT '',
+      provider_customer_id TEXT DEFAULT '', provider_subscription_id TEXT DEFAULT '',
+      current_period_end TIMESTAMP, inadimplente_em TIMESTAMP,
       criado_em TIMESTAMP DEFAULT ${now}
     )`,
     `CREATE TABLE IF NOT EXISTS usuarios (
@@ -125,6 +128,7 @@ async function createSchema() {
       id ${id}, empresa_id INTEGER, cliente_id INTEGER, nome TEXT NOT NULL,
       tipo TEXT DEFAULT '', marca TEXT DEFAULT '', modelo TEXT DEFAULT '',
       tamanho TEXT DEFAULT '', registro TEXT DEFAULT '', observacao TEXT DEFAULT '',
+      proxima_manutencao TEXT DEFAULT '', validade_documento TEXT DEFAULT '', qr_token TEXT DEFAULT '',
       criado_em TIMESTAMP DEFAULT ${now}
     )`,
     `CREATE TABLE IF NOT EXISTS ordens_servico (
@@ -133,6 +137,7 @@ async function createSchema() {
       tipo TEXT DEFAULT 'Servico', prioridade TEXT DEFAULT 'normal',
       status TEXT DEFAULT 'aguardando', descricao TEXT DEFAULT '', responsavel TEXT DEFAULT '', responsavel_id INTEGER,
       abertura TEXT DEFAULT '', previsao TEXT DEFAULT '', fotos INTEGER DEFAULT 0,
+      relatorio_aceito INTEGER DEFAULT 0, relatorio_aceito_por TEXT DEFAULT '', relatorio_aceito_em TIMESTAMP,
       observacao TEXT DEFAULT '', criado_em TIMESTAMP DEFAULT ${now}
     )`,
     `CREATE TABLE IF NOT EXISTS os_tarefas (
@@ -146,15 +151,47 @@ async function createSchema() {
       id ${id}, empresa_id INTEGER, os_id INTEGER NOT NULL, membro_id INTEGER,
       autor TEXT NOT NULL, descricao TEXT NOT NULL, criado_em TIMESTAMP DEFAULT ${now}
     )`,
+    `CREATE TABLE IF NOT EXISTS os_orcamentos (
+      id ${id}, empresa_id INTEGER, os_id INTEGER NOT NULL,
+      status TEXT DEFAULT 'rascunho', desconto REAL DEFAULT 0, acrescimo REAL DEFAULT 0,
+      cliente_aprovou INTEGER DEFAULT 0, aprovado_por TEXT DEFAULT '', aprovado_em TIMESTAMP,
+      observacao TEXT DEFAULT '', criado_em TIMESTAMP DEFAULT ${now}
+    )`,
+    `CREATE TABLE IF NOT EXISTS os_orcamento_itens (
+      id ${id}, empresa_id INTEGER, os_id INTEGER NOT NULL,
+      tipo TEXT NOT NULL DEFAULT 'servico', descricao TEXT NOT NULL,
+      funcao TEXT DEFAULT '', quantidade REAL DEFAULT 1, unidade TEXT DEFAULT 'un',
+      valor_unitario REAL DEFAULT 0, total REAL DEFAULT 0, criado_em TIMESTAMP DEFAULT ${now}
+    )`,
     `CREATE TABLE IF NOT EXISTS fotos (
       id ${id}, empresa_id INTEGER, tipo TEXT NOT NULL, referencia_id INTEGER NOT NULL,
       url TEXT NOT NULL, legenda TEXT DEFAULT '', categoria TEXT DEFAULT 'geral',
+      storage_provider TEXT DEFAULT 'data_url_mvp', storage_key TEXT DEFAULT '',
+      mime_type TEXT DEFAULT '', tamanho_bytes INTEGER DEFAULT 0,
       criado_em TIMESTAMP DEFAULT ${now}
     )`,
     `CREATE TABLE IF NOT EXISTS notificacoes (
       id ${id}, empresa_id INTEGER, usuario_id INTEGER NOT NULL, tipo TEXT DEFAULT 'info',
       lida INTEGER DEFAULT 0, icone TEXT DEFAULT '', titulo TEXT NOT NULL, corpo TEXT DEFAULT '',
-      acao TEXT DEFAULT '', categoria TEXT DEFAULT 'geral', criado_em TIMESTAMP DEFAULT ${now}
+      acao TEXT DEFAULT '', categoria TEXT DEFAULT 'geral', canal TEXT DEFAULT 'app',
+      destinatario TEXT DEFAULT '', status_envio TEXT DEFAULT 'pendente', criado_em TIMESTAMP DEFAULT ${now}
+    )`,
+    `CREATE TABLE IF NOT EXISTS auditoria (
+      id ${id}, empresa_id INTEGER, usuario_id INTEGER, usuario_nome TEXT DEFAULT '',
+      entidade TEXT NOT NULL, entidade_id INTEGER, acao TEXT NOT NULL,
+      resumo TEXT DEFAULT '', antes TEXT DEFAULT '', depois TEXT DEFAULT '',
+      criado_em TIMESTAMP DEFAULT ${now}
+    )`,
+    `CREATE TABLE IF NOT EXISTS pagamento_eventos (
+      id ${id}, empresa_id INTEGER, provider TEXT DEFAULT '',
+      event_id TEXT DEFAULT '', tipo TEXT NOT NULL, status TEXT DEFAULT '',
+      payload TEXT DEFAULT '', processado_em TIMESTAMP DEFAULT ${now}
+    )`,
+    `CREATE TABLE IF NOT EXISTS error_logs (
+      id ${id}, empresa_id INTEGER, usuario_id INTEGER,
+      request_id TEXT DEFAULT '', method TEXT DEFAULT '', path TEXT DEFAULT '',
+      status INTEGER DEFAULT 500, mensagem TEXT DEFAULT '', stack TEXT DEFAULT '',
+      criado_em TIMESTAMP DEFAULT ${now}
     )`,
     `CREATE TABLE IF NOT EXISTS bercos (
       id ${id}, empresa_id INTEGER, numero TEXT NOT NULL, embarcacao TEXT DEFAULT '-',
@@ -168,6 +205,12 @@ async function createSchema() {
 
 async function migrateTenantColumns() {
   await addColumn("empresas", "trial_termina_em TIMESTAMP");
+  await addColumn("empresas", "billing_status TEXT DEFAULT 'trialing'");
+  await addColumn("empresas", "billing_provider TEXT DEFAULT ''");
+  await addColumn("empresas", "provider_customer_id TEXT DEFAULT ''");
+  await addColumn("empresas", "provider_subscription_id TEXT DEFAULT ''");
+  await addColumn("empresas", "current_period_end TIMESTAMP");
+  await addColumn("empresas", "inadimplente_em TIMESTAMP");
   await addColumn("usuarios", "empresa_id INTEGER");
   await addColumn("usuarios", "papel TEXT NOT NULL DEFAULT 'membro'");
 
@@ -181,8 +224,11 @@ async function migrateTenantColumns() {
     "ordens_servico",
     "os_auxiliares",
     "os_execucoes",
+    "os_orcamentos",
+    "os_orcamento_itens",
     "fotos",
     "notificacoes",
+    "auditoria",
     "bercos",
   ]) {
     await addColumn(table, "empresa_id INTEGER");
@@ -190,10 +236,19 @@ async function migrateTenantColumns() {
   await addColumn("ordens_servico", "cliente_id INTEGER");
   await addColumn("ordens_servico", "embarcacao_id INTEGER");
   await addColumn("ordens_servico", "responsavel_id INTEGER");
+  await addColumn("ordens_servico", "relatorio_aceito INTEGER DEFAULT 0");
+  await addColumn("ordens_servico", "relatorio_aceito_por TEXT DEFAULT ''");
+  await addColumn("ordens_servico", "relatorio_aceito_em TIMESTAMP");
   await addColumn("tripulacao", "funcao TEXT DEFAULT ''");
   await addColumn("tripulacao", "telefone TEXT DEFAULT ''");
   await addColumn("tripulacao", "disponibilidade TEXT DEFAULT 'disponivel'");
   await addColumn("tripulacao", "observacao TEXT DEFAULT ''");
+  await addColumn("embarcacoes", "proxima_manutencao TEXT DEFAULT ''");
+  await addColumn("embarcacoes", "validade_documento TEXT DEFAULT ''");
+  await addColumn("embarcacoes", "qr_token TEXT DEFAULT ''");
+  await addColumn("notificacoes", "canal TEXT DEFAULT 'app'");
+  await addColumn("notificacoes", "destinatario TEXT DEFAULT ''");
+  await addColumn("notificacoes", "status_envio TEXT DEFAULT 'pendente'");
   await run("UPDATE tripulacao SET funcao = cargo WHERE funcao IS NULL OR funcao = ''");
   await run("UPDATE tripulacao SET telefone = '' WHERE telefone IS NULL");
   await run("UPDATE tripulacao SET disponibilidade = 'disponivel' WHERE disponibilidade IS NULL OR disponibilidade = ''");
@@ -225,8 +280,11 @@ async function migrateTenantColumns() {
     "ordens_servico",
     "os_auxiliares",
     "os_execucoes",
+    "os_orcamentos",
+    "os_orcamento_itens",
     "fotos",
     "notificacoes",
+    "auditoria",
     "bercos",
   ]) {
     await run(`UPDATE ${table} SET empresa_id = ? WHERE empresa_id IS NULL`, [empresa.id]);
@@ -242,6 +300,9 @@ async function migrateTenantColumns() {
     await execute("CREATE INDEX IF NOT EXISTS idx_fotos_referencia ON fotos (empresa_id, tipo, referencia_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_os_auxiliares_os ON os_auxiliares (empresa_id, os_id)");
     await execute("CREATE INDEX IF NOT EXISTS idx_os_execucoes_os ON os_execucoes (empresa_id, os_id)");
+    await execute("CREATE INDEX IF NOT EXISTS idx_os_orcamentos_os ON os_orcamentos (empresa_id, os_id)");
+    await execute("CREATE INDEX IF NOT EXISTS idx_os_orcamento_itens_os ON os_orcamento_itens (empresa_id, os_id)");
+    await execute("CREATE INDEX IF NOT EXISTS idx_auditoria_empresa ON auditoria (empresa_id, criado_em)");
     await execute("CREATE INDEX IF NOT EXISTS idx_bercos_empresa ON bercos (empresa_id)");
   }
 }
@@ -279,7 +340,109 @@ async function migrateOrderTeamColumns() {
   }
 }
 
+async function migratePhotoStorageColumns() {
+  await addColumn("fotos", "storage_provider TEXT DEFAULT 'data_url_mvp'");
+  await addColumn("fotos", "storage_key TEXT DEFAULT ''");
+  await addColumn("fotos", "mime_type TEXT DEFAULT ''");
+  await addColumn("fotos", "tamanho_bytes INTEGER DEFAULT 0");
+  await run("UPDATE fotos SET storage_provider = 'data_url_mvp' WHERE storage_provider IS NULL OR storage_provider = ''");
+  await run("UPDATE fotos SET storage_key = '' WHERE storage_key IS NULL");
+  await run("UPDATE fotos SET mime_type = '' WHERE mime_type IS NULL");
+  await run("UPDATE fotos SET tamanho_bytes = 0 WHERE tamanho_bytes IS NULL");
+}
+
+async function migrateBudgetColumns() {
+  const budgetId = engine === "postgresql"
+    ? "INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY"
+    : "INTEGER PRIMARY KEY AUTOINCREMENT";
+
+  await execute(`CREATE TABLE IF NOT EXISTS os_orcamentos (
+    id ${budgetId}, empresa_id INTEGER, os_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'rascunho', desconto REAL DEFAULT 0, acrescimo REAL DEFAULT 0,
+    cliente_aprovou INTEGER DEFAULT 0, aprovado_por TEXT DEFAULT '', aprovado_em TIMESTAMP,
+    observacao TEXT DEFAULT '', criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await execute(`CREATE TABLE IF NOT EXISTS os_orcamento_itens (
+    id ${budgetId}, empresa_id INTEGER, os_id INTEGER NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'servico', descricao TEXT NOT NULL,
+    funcao TEXT DEFAULT '', quantidade REAL DEFAULT 1, unidade TEXT DEFAULT 'un',
+    valor_unitario REAL DEFAULT 0, total REAL DEFAULT 0, criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+  if (engine === "postgresql") {
+    await execute("CREATE INDEX IF NOT EXISTS idx_os_orcamentos_os ON os_orcamentos (empresa_id, os_id)");
+    await execute("CREATE INDEX IF NOT EXISTS idx_os_orcamento_itens_os ON os_orcamento_itens (empresa_id, os_id)");
+  }
+}
+
+async function migrateReportAcceptanceColumns() {
+  await addColumn("ordens_servico", "relatorio_aceito INTEGER DEFAULT 0");
+  await addColumn("ordens_servico", "relatorio_aceito_por TEXT DEFAULT ''");
+  await addColumn("ordens_servico", "relatorio_aceito_em TIMESTAMP");
+  await run("UPDATE ordens_servico SET relatorio_aceito = 0 WHERE relatorio_aceito IS NULL");
+  await run("UPDATE ordens_servico SET relatorio_aceito_por = '' WHERE relatorio_aceito_por IS NULL");
+}
+
+async function migrateAdvancedOperationsColumns() {
+  const auditId = engine === "postgresql"
+    ? "INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY"
+    : "INTEGER PRIMARY KEY AUTOINCREMENT";
+
+  await addColumn("embarcacoes", "proxima_manutencao TEXT DEFAULT ''");
+  await addColumn("embarcacoes", "validade_documento TEXT DEFAULT ''");
+  await addColumn("embarcacoes", "qr_token TEXT DEFAULT ''");
+  await addColumn("notificacoes", "canal TEXT DEFAULT 'app'");
+  await addColumn("notificacoes", "destinatario TEXT DEFAULT ''");
+  await addColumn("notificacoes", "status_envio TEXT DEFAULT 'pendente'");
+  await execute(`CREATE TABLE IF NOT EXISTS auditoria (
+    id ${auditId}, empresa_id INTEGER, usuario_id INTEGER, usuario_nome TEXT DEFAULT '',
+    entidade TEXT NOT NULL, entidade_id INTEGER, acao TEXT NOT NULL,
+    resumo TEXT DEFAULT '', antes TEXT DEFAULT '', depois TEXT DEFAULT '',
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+  if (engine === "postgresql") {
+    await execute("CREATE INDEX IF NOT EXISTS idx_auditoria_empresa ON auditoria (empresa_id, criado_em)");
+  }
+}
+
+async function migrateCommercialSaasColumns() {
+  const id = engine === "postgresql"
+    ? "INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY"
+    : "INTEGER PRIMARY KEY AUTOINCREMENT";
+
+  await addColumn("empresas", "billing_status TEXT DEFAULT 'trialing'");
+  await addColumn("empresas", "billing_provider TEXT DEFAULT ''");
+  await addColumn("empresas", "provider_customer_id TEXT DEFAULT ''");
+  await addColumn("empresas", "provider_subscription_id TEXT DEFAULT ''");
+  await addColumn("empresas", "current_period_end TIMESTAMP");
+  await addColumn("empresas", "inadimplente_em TIMESTAMP");
+  await run("UPDATE empresas SET billing_status = CASE WHEN plano = 'trial' THEN 'trialing' ELSE 'active' END WHERE billing_status IS NULL OR billing_status = ''");
+
+  await execute(`CREATE TABLE IF NOT EXISTS pagamento_eventos (
+    id ${id}, empresa_id INTEGER, provider TEXT DEFAULT '',
+    event_id TEXT DEFAULT '', tipo TEXT NOT NULL, status TEXT DEFAULT '',
+    payload TEXT DEFAULT '', processado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+}
+
+async function migrateReliabilityColumns() {
+  const id = engine === "postgresql"
+    ? "INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY"
+    : "INTEGER PRIMARY KEY AUTOINCREMENT";
+
+  await execute(`CREATE TABLE IF NOT EXISTS error_logs (
+    id ${id}, empresa_id INTEGER, usuario_id INTEGER,
+    request_id TEXT DEFAULT '', method TEXT DEFAULT '', path TEXT DEFAULT '',
+    status INTEGER DEFAULT 500, mensagem TEXT DEFAULT '', stack TEXT DEFAULT '',
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`);
+  if (engine === "postgresql") {
+    await execute("CREATE INDEX IF NOT EXISTS idx_error_logs_criado ON error_logs (criado_em)");
+  }
+}
+
 async function seed() {
+  if (process.env.NODE_ENV === "production" || process.env.DISABLE_DEMO_SEED === "1") return;
+
   const count = await get("SELECT COUNT(*) AS total FROM usuarios");
   if (Number(count.total) > 0) return;
 
@@ -444,6 +607,72 @@ async function initialize() {
     await run(
       "INSERT INTO schema_migrations (version) VALUES (?)",
       ["004_order_team"],
+    );
+  }
+  const photoStorageMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["005_photo_storage_metadata"],
+  );
+  if (!photoStorageMigration) {
+    await migratePhotoStorageColumns();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["005_photo_storage_metadata"],
+    );
+  }
+  const budgetMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["006_order_budget"],
+  );
+  if (!budgetMigration) {
+    await migrateBudgetColumns();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["006_order_budget"],
+    );
+  }
+  const reportAcceptanceMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["007_report_acceptance"],
+  );
+  if (!reportAcceptanceMigration) {
+    await migrateReportAcceptanceColumns();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["007_report_acceptance"],
+    );
+  }
+  const advancedOpsMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["008_advanced_operations"],
+  );
+  if (!advancedOpsMigration) {
+    await migrateAdvancedOperationsColumns();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["008_advanced_operations"],
+    );
+  }
+  const commercialSaasMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["009_commercial_saas"],
+  );
+  if (!commercialSaasMigration) {
+    await migrateCommercialSaasColumns();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["009_commercial_saas"],
+    );
+  }
+  const reliabilityMigration = await get(
+    "SELECT version FROM schema_migrations WHERE version = ?",
+    ["010_reliability_scale"],
+  );
+  if (!reliabilityMigration) {
+    await migrateReliabilityColumns();
+    await run(
+      "INSERT INTO schema_migrations (version) VALUES (?)",
+      ["010_reliability_scale"],
     );
   }
   await seed();
