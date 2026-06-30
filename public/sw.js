@@ -1,4 +1,4 @@
-const CACHE_NAME = "bordo-shell-v1";
+const CACHE_NAME = "bordo-shell-v2";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/anchor.svg"];
 
 self.addEventListener("install", (event) => {
@@ -35,8 +35,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (url.pathname.startsWith("/assets/") || url.pathname === "/sw.js") {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy));
+          return response;
+        })
+        .catch(() => caches.match("/index.html")),
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+      if (!response.ok) return response;
       const copy = response.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
       return response;

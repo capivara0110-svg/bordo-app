@@ -40,9 +40,26 @@ app.get("/api/health", (req, res) => {
 });
 
 const distPath = path.resolve(__dirname, "..", "dist");
-app.use(express.static(distPath));
+app.use(express.static(distPath, {
+  setHeaders(res, filePath) {
+    const fileName = path.basename(filePath);
+    if (fileName === "index.html" || fileName === "sw.js") {
+      res.setHeader("Cache-Control", "no-store");
+      return;
+    }
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    }
+  },
+}));
+
+app.get(/^\/assets\//, (req, res) => {
+  res.status(404).type("text/plain").send("Asset nao encontrado. Atualize a pagina.");
+});
+
 app.get("/{*splat}", (req, res, next) => {
   if (req.path.startsWith("/api/")) return next();
+  if (path.extname(req.path)) return res.status(404).type("text/plain").send("Arquivo nao encontrado.");
   res.sendFile(path.join(distPath, "index.html"));
 });
 
