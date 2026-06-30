@@ -129,7 +129,7 @@ router.get("/:id/qrcode", auth, async (req, res) => {
   if (!embarcacao) return res.status(404).json({ erro: "Embarcacao nao encontrada" });
 
   const token = await ensureQrToken(embarcacao);
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const baseUrl = process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get("host")}`;
   const url = `${baseUrl}/embarcacao/${token}`;
   const svg = await QRCode.toString(url, { type: "svg", margin: 1, width: 220 });
   return res.json({ token, url, svg });
