@@ -323,6 +323,7 @@ export const api = {
   // ─── DASHBOARD ────────────────────────────────────────
   dashboard: {
     dados: () => request("/dashboard"),
+    produtividade: (dias = 30) => request(`/dashboard/produtividade?dias=${dias}`),
   },
 
   agenda: {

@@ -4,11 +4,12 @@ const auth = require("../middleware.cjs");
 const { requireAccess } = require("../middleware.cjs");
 const { requirePlanoAtivo, requireLimite } = require("../planos.cjs");
 const { audit } = require("../audit.cjs");
+const { preparePhotoPayload } = require("../photo-storage.cjs");
 
 const router = express.Router();
-const canManage = requireAccess({
+const canPlanOrder = requireAccess({
   roles: ["proprietario", "gestor", "tecnico"],
-  profiles: ["gestor", "tecnico", "marinharia"],
+  profiles: ["gestor", "tecnico"],
 });
 const allowedStatus = ["aguardando", "em_andamento", "concluida", "cancelada"];
 const allowedPriorities = ["baixa", "media", "normal", "alta", "urgente"];
@@ -309,27 +310,6 @@ function clean(value) {
   return String(value || "").trim();
 }
 
-function cleanPhotoPayload(body) {
-  const url = clean(body.url);
-  if (!url) return { erro: "Foto obrigatoria" };
-  if (!url.startsWith("data:image/") && !/^https?:\/\//i.test(url)) {
-    return { erro: "Formato de foto invalido" };
-  }
-  if (url.length > 750000) return { erro: "Foto muito grande" };
-  const categoria = allowedPhotoCategories.includes(body.categoria) ? body.categoria : "geral";
-  const dataUrlMatch = url.match(/^data:([^;]+);base64,(.+)$/);
-  const storageProvider = url.startsWith("data:image/") ? "data_url_mvp" : "external_url";
-  return {
-    url,
-    categoria,
-    legenda: clean(body.legenda).slice(0, 180),
-    storage_provider: storageProvider,
-    storage_key: storageProvider === "external_url" ? clean(body.storage_key).slice(0, 240) : "",
-    mime_type: dataUrlMatch?.[1] || clean(body.mime_type).slice(0, 80),
-    tamanho_bytes: dataUrlMatch?.[2] ? Math.ceil((dataUrlMatch[2].length * 3) / 4) : Number(body.tamanho_bytes) || 0,
-  };
-}
-
 async function resolveCliente(value, empresaId) {
   const id = Number(value) || null;
   if (!id) return null;
@@ -390,7 +370,7 @@ router.get("/modelos", auth, async (req, res) => {
   return res.json(Object.entries(serviceTemplates).map(([id, data]) => ({ id, ...data })));
 });
 
-router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"), async (req, res) => {
+router.post("/", auth, canPlanOrder, requirePlanoAtivo, requireLimite("ordensMes"), async (req, res) => {
   const { tipo, prioridade, descricao, responsavel, previsao, tarefas } = req.body;
   const local = clean(req.body.local).slice(0, 160);
   const selectedTemplate = serviceTemplates[clean(req.body.modelo || "").toLowerCase()]
@@ -445,7 +425,7 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
   return res.status(201).json(created);
 });
 
-router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.put("/:id", auth, canPlanOrder, requirePlanoAtivo, async (req, res) => {
   const current = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!current) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
@@ -517,7 +497,7 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
   return res.json(updated);
 });
 
-router.put("/:id/status", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.put("/:id/status", auth, requirePlanoAtivo, async (req, res) => {
   if (!allowedStatus.includes(req.body.status)) {
     return res.status(400).json({ erro: "Status invalido" });
   }
@@ -534,7 +514,7 @@ router.put("/:id/status", auth, canManage, requirePlanoAtivo, async (req, res) =
   return res.json(updated);
 });
 
-router.post("/:id/tarefas", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.post("/:id/tarefas", auth, canPlanOrder, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
@@ -546,7 +526,7 @@ router.post("/:id/tarefas", auth, canManage, requirePlanoAtivo, async (req, res)
   return res.status(201).json(await getOrder(req.params.id, req.usuario.empresa_id, req.usuario));
 });
 
-router.put("/:id/orcamento", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.put("/:id/orcamento", auth, canPlanOrder, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
@@ -577,7 +557,7 @@ router.put("/:id/orcamento", auth, canManage, requirePlanoAtivo, async (req, res
   return res.json(budget);
 });
 
-router.post("/:id/orcamento/itens", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.post("/:id/orcamento/itens", auth, canPlanOrder, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
@@ -604,7 +584,7 @@ router.post("/:id/orcamento/itens", auth, canManage, requirePlanoAtivo, async (r
   return res.status(201).json(await getOrderBudget(order.id, req.usuario.empresa_id));
 });
 
-router.delete("/:id/orcamento/itens/:itemId", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.delete("/:id/orcamento/itens/:itemId", auth, canPlanOrder, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
@@ -623,7 +603,7 @@ router.get("/:id/relatorio", auth, async (req, res) => {
   return res.json(await getOrderReport(order, req.usuario.empresa_id));
 });
 
-router.post("/:id/relatorio/aceite", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.post("/:id/relatorio/aceite", auth, canPlanOrder, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
@@ -644,7 +624,7 @@ router.post("/:id/relatorio/aceite", auth, canManage, requirePlanoAtivo, async (
   return res.json(await getOrderReport(updated, req.usuario.empresa_id));
 });
 
-router.post("/:id/orcamento/aprovacao", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.post("/:id/orcamento/aprovacao", auth, canPlanOrder, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
@@ -675,11 +655,16 @@ router.get("/:id/fotos", auth, async (req, res) => {
   return res.json(await getOrderPhotos(req.params.id, req.usuario.empresa_id));
 });
 
-router.post("/:id/fotos", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.post("/:id/fotos", auth, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
-  const foto = cleanPhotoPayload(req.body);
+  const foto = await preparePhotoPayload(req.body, {
+    empresaId: req.usuario.empresa_id,
+    tipo: "ordem",
+    referenciaId: req.params.id,
+    allowedCategories: allowedPhotoCategories,
+  });
   if (foto.erro) return res.status(400).json({ erro: foto.erro });
 
   const result = await db.prepare(
@@ -712,7 +697,7 @@ router.post("/:id/fotos", auth, canManage, requirePlanoAtivo, async (req, res) =
   });
 });
 
-router.post("/:id/execucoes", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.post("/:id/execucoes", auth, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 
@@ -736,7 +721,7 @@ router.post("/:id/execucoes", auth, canManage, requirePlanoAtivo, async (req, re
   });
 });
 
-router.put("/:id/tarefa/:tarefaId", auth, canManage, requirePlanoAtivo, async (req, res) => {
+router.put("/:id/tarefa/:tarefaId", auth, requirePlanoAtivo, async (req, res) => {
   const order = await getOrder(req.params.id, req.usuario.empresa_id, req.usuario);
   if (!order) return res.status(404).json({ erro: "Ordem nao encontrada" });
 

@@ -5,6 +5,7 @@ const cors = require("cors");
 const path = require("path");
 const db = require("./database.cjs");
 const { log, requestLogger } = require("./logger.cjs");
+const { uploadRoot } = require("./photo-storage.cjs");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -13,6 +14,11 @@ app.set("trust proxy", 1);
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use(requestLogger);
+
+app.use("/uploads", express.static(uploadRoot, {
+  immutable: true,
+  maxAge: "30d",
+}));
 
 app.use("/api/auth", require("./routes/auth.cjs"));
 app.use("/api/empresa", require("./routes/empresa.cjs"));

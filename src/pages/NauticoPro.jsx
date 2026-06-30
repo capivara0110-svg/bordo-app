@@ -7,7 +7,10 @@ import { compressImageFile } from "../utils/photos.js";
 
 export default function NauticoPro({ profile, onLogout }) {
   const fullProfile = PERFIS_SISTEMA.find(p => p.id === profile.id) || profile;
-  const [tab, setTab] = useState(fullProfile.tabs?.[0]?.id || "diario");
+  const initialTab = fullProfile.tabs?.some((item) => item.id === "ordens")
+    ? fullProfile.tabs[0].id
+    : "ordens";
+  const [tab, setTab] = useState(initialTab);
 
   // Estados dos dados
   const [diario, setDiario] = useState([]);
@@ -25,13 +28,17 @@ export default function NauticoPro({ profile, onLogout }) {
   const [photoMessage, setPhotoMessage] = useState("");
   const [photoSaving, setPhotoSaving] = useState(false);
   const [orderMessage, setOrderMessage] = useState("");
+  const [executionNotes, setExecutionNotes] = useState({});
 
-  const tabs = fullProfile.tabs || [
+  const baseTabs = fullProfile.tabs || [
     { id: "diario", icon: "📋", label: "Diário" },
     { id: "checklist", icon: "✅", label: "Check-list" },
     { id: "tripulacao", icon: "👥", label: "Tripulação" },
     { id: "estoque", icon: "📦", label: "Estoque" },
   ];
+  const tabs = baseTabs.some((item) => item.id === "ordens")
+    ? baseTabs
+    : [{ id: "ordens", icon: "🔧", label: "Serviços" }, ...baseTabs].slice(0, 5);
 
   // Carrega dados ao abrir
   useEffect(() => {
@@ -117,6 +124,39 @@ export default function NauticoPro({ profile, onLogout }) {
       setOrdens((current) => current.map((os) => (os.id === orderId ? updated : os)));
     } catch (err) {
       setOrderMessage(err.message || "Nao foi possivel marcar a tarefa.");
+    }
+  };
+
+  const updateOrderStatus = async (orderId, status) => {
+    setOrderMessage("");
+    try {
+      const updated = await api.ordens.atualizarStatus(orderId, status);
+      setOrdens((current) => current.map((os) => (os.id === orderId ? updated : os)));
+      setOrderMessage(status === "concluida" ? "OS concluida." : "OS iniciada.");
+    } catch (err) {
+      setOrderMessage(err.message || "Nao foi possivel atualizar a OS.");
+    }
+  };
+
+  const registerExecution = async (orderId) => {
+    const descricao = String(executionNotes[orderId] || "").trim();
+    if (!descricao) {
+      setOrderMessage("Escreva uma observacao antes de registrar.");
+      return;
+    }
+    setOrderMessage("");
+    try {
+      const execution = await api.ordens.registrarExecucao(orderId, {
+        autor: fullProfile.user?.name,
+        descricao,
+      });
+      setOrdens((current) => current.map((os) => (
+        os.id === orderId ? { ...os, execucoes: [execution, ...(os.execucoes || [])] } : os
+      )));
+      setExecutionNotes((current) => ({ ...current, [orderId]: "" }));
+      setOrderMessage("Observacao registrada no historico da OS.");
+    } catch (err) {
+      setOrderMessage(err.message || "Nao foi possivel registrar a observacao.");
     }
   };
 
@@ -363,14 +403,20 @@ export default function NauticoPro({ profile, onLogout }) {
         );
 
       case "ordens":
+        const openOrders = ordens.filter((os) => os.status !== "concluida" && os.status !== "cancelada");
+        const doneOrders = ordens.filter((os) => os.status === "concluida");
         return (
           <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Minhas OS</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{ordens.length} servicos atribuidos</div>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Meus servicos</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{openOrders.length} em aberto</div>
               <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 4 }}>
-                Execute o checklist, registre fotos e avance o servico.
+                Checklist, fotos e observacoes ficam registradas para o gestor acompanhar.
               </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+              <MiniMetric label="Abertas" value={openOrders.length} color={C.aqua} />
+              <MiniMetric label="Finalizadas" value={doneOrders.length} color={C.green} />
             </div>
             {orderMessage && <div style={{ color: C.rust, background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>{orderMessage}</div>}
             {photoPanel && (
@@ -385,11 +431,17 @@ export default function NauticoPro({ profile, onLogout }) {
                 onChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
               />
             )}
+            {ordens.length === 0 && (
+              <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, textAlign: "center", color: "rgba(255,255,255,0.48)", fontSize: 13, lineHeight: 1.5 }}>
+                Nenhum servico atribuido para voce agora. Quando o gestor colocar seu nome como responsavel ou auxiliar, a OS aparece aqui.
+              </div>
+            )}
             <div className="bordo-list-grid">
             {ordens.map(os => {
               const tasks = os.itens || [];
               const done = tasks.filter((item) => Number(item.done)).length;
               const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+              const latestExecution = (os.execucoes || [])[0];
               return (
                 <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -401,6 +453,18 @@ export default function NauticoPro({ profile, onLogout }) {
                     <StatusBadge status={os.status} />
                   </div>
                   <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 8, lineHeight: 1.4 }}>{os.descricao}</p>
+                  <div style={{ display: "grid", gridTemplateColumns: os.status === "aguardando" ? "1fr 1fr" : "1fr", gap: 8, marginBottom: 10 }}>
+                    {os.status === "aguardando" && (
+                      <button type="button" onClick={() => updateOrderStatus(os.id, "em_andamento")} style={primaryButton}>
+                        Iniciar servico
+                      </button>
+                    )}
+                    {os.status !== "concluida" && (
+                      <button type="button" onClick={() => updateOrderStatus(os.id, "concluida")} style={ghostButton}>
+                        Concluir OS
+                      </button>
+                    )}
+                  </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.tipo}</span>
                     <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.prioridade}</span>
@@ -432,6 +496,26 @@ export default function NauticoPro({ profile, onLogout }) {
                         <span style={{ fontSize: 12 }}>{item.tarefa}</span>
                       </button>
                     ))}
+                  </div>
+
+                  <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
+                    <label style={fieldStyle}>
+                      Observacao do servico
+                      <textarea
+                        value={executionNotes[os.id] || ""}
+                        onChange={(event) => setExecutionNotes((current) => ({ ...current, [os.id]: event.target.value }))}
+                        placeholder="Ex.: limpeza do conves finalizada, falta produto X..."
+                        style={{ ...inputStyle, minHeight: 74, resize: "vertical" }}
+                      />
+                    </label>
+                    <button type="button" onClick={() => registerExecution(os.id)} style={{ ...primaryButton, width: "100%", marginTop: 8 }}>
+                      Registrar observacao
+                    </button>
+                    {latestExecution && (
+                      <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 11, lineHeight: 1.4, marginTop: 8 }}>
+                        Ultimo registro: {latestExecution.autor} - {latestExecution.descricao}
+                      </div>
+                    )}
                   </div>
 
                   <button type="button" onClick={() => openPhotoPanel(os)} style={{ marginTop: 10, width: "100%", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.72)", padding: "9px 12px", fontWeight: 700, cursor: "pointer" }}>
@@ -523,6 +607,15 @@ const photoCategories = [
   ["depois", "Depois"],
   ["documento", "Documento"],
 ];
+
+function MiniMetric({ label, value, color }) {
+  return (
+    <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 12 }}>
+      <div style={{ color, fontSize: 10, fontWeight: 900, letterSpacing: 1.4, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ color: C.white, fontSize: 22, fontWeight: 900, marginTop: 4 }}>{value}</div>
+    </div>
+  );
+}
 
 function PhotoPanel({ panel, form, message, saving, onClose, onSubmit, onFile, onChange }) {
   return (

@@ -9,6 +9,7 @@ const projectRoot = path.resolve(__dirname, "..", "..");
 const port = 32000 + Math.floor(Math.random() * 1000);
 const baseUrl = `http://127.0.0.1:${port}/api`;
 const dbPath = path.join(os.tmpdir(), `bordo-test-${process.pid}-${Date.now()}.db`);
+const uploadPath = path.join(os.tmpdir(), `bordo-uploads-${process.pid}-${Date.now()}`);
 let server;
 
 async function request(pathname, options = {}, token) {
@@ -47,6 +48,7 @@ test.before(async () => {
       DATABASE_URL: "",
       PG_URL: "",
       JWT_SECRET: "test-secret",
+      BORDO_UPLOAD_DIR: uploadPath,
     },
     stdio: "ignore",
   });
@@ -64,6 +66,11 @@ test.after(async () => {
     } catch {
       // Windows can briefly retain a SQLite file handle after process exit.
     }
+  }
+  try {
+    fs.rmSync(uploadPath, { recursive: true, force: true });
+  } catch {
+    // Windows can briefly retain a file handle after process exit.
   }
 });
 
@@ -219,6 +226,9 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   }, first.body.token);
   assert.equal(orderPhoto.status, 201);
   assert.equal(orderPhoto.body.categoria, "antes");
+  assert.equal(orderPhoto.body.storage_provider, "local_volume");
+  assert.match(orderPhoto.body.url, /^\/uploads\//);
+  assert.equal(orderPhoto.body.url.startsWith("data:image/"), false);
 
   const orderPhotos = await request(`/ordens/${createdOrder.body.id}/fotos`, {}, first.body.token);
   assert.equal(orderPhotos.status, 200);
@@ -232,6 +242,8 @@ test("isola dados entre empresas e aplica permissoes", async () => {
     body: JSON.stringify({ url: samplePhoto, legenda: "Casco", categoria: "geral" }),
   }, first.body.token);
   assert.equal(boatPhoto.status, 201);
+  assert.equal(boatPhoto.body.storage_provider, "local_volume");
+  assert.match(boatPhoto.body.url, /^\/uploads\//);
 
   const boatPhotos = await request(`/embarcacoes/${createdBoat.body.id}/fotos`, {}, first.body.token);
   assert.equal(boatPhotos.status, 200);
@@ -316,6 +328,24 @@ test("isola dados entre empresas e aplica permissoes", async () => {
   }, first.body.token);
   assert.equal(member.status, 201);
 
+  const teamAfterMember = await request("/tripulacao", {}, first.body.token);
+  const memberTeam = teamAfterMember.body.find((item) => item.nome === "Membro Um");
+  assert.ok(memberTeam);
+
+  const memberOrder = await request("/ordens", {
+    method: "POST",
+    body: JSON.stringify({
+      embarcacao: "Servico avulso",
+      cliente: "Cliente Marina",
+      tipo: "Limpeza",
+      responsavel_id: memberTeam.id,
+      local: "Marina Teste",
+      tarefas: ["Executar limpeza", "Registrar foto final"],
+    }),
+  }, first.body.token);
+  assert.equal(memberOrder.status, 201);
+  assert.equal(memberOrder.body.responsavel, "Membro Um");
+
   const secondMember = await request("/empresa/membros", {
     method: "POST",
     body: JSON.stringify({
@@ -346,6 +376,58 @@ test("isola dados entre empresas e aplica permissoes", async () => {
     body: JSON.stringify({ email: memberEmail, senha: "senha-membro-1" }),
   });
   assert.equal(memberLogin.status, 200);
+
+  const deniedOrderCreate = await request("/ordens", {
+    method: "POST",
+    body: JSON.stringify({ embarcacao: "Nao pode", tipo: "Limpeza" }),
+  }, memberLogin.body.token);
+  assert.equal(deniedOrderCreate.status, 403);
+
+  const memberOrders = await request("/ordens", {}, memberLogin.body.token);
+  assert.equal(memberOrders.status, 200);
+  assert.equal(memberOrders.body.length, 1);
+  assert.equal(memberOrders.body[0].codigo, memberOrder.body.codigo);
+
+  const memberTask = await request(`/ordens/${memberOrder.body.id}/tarefa/${memberOrder.body.itens[0].id}`, {
+    method: "PUT",
+  }, memberLogin.body.token);
+  assert.equal(memberTask.status, 200);
+  assert.equal(Number(memberTask.body.itens[0].done), 1);
+
+  const memberExecution = await request(`/ordens/${memberOrder.body.id}/execucoes`, {
+    method: "POST",
+    body: JSON.stringify({ descricao: "Limpeza iniciada pelo colaborador" }),
+  }, memberLogin.body.token);
+  assert.equal(memberExecution.status, 201);
+  assert.equal(memberExecution.body.autor, "Membro Um");
+
+  const memberPhoto = await request(`/ordens/${memberOrder.body.id}/fotos`, {
+    method: "POST",
+    body: JSON.stringify({ url: samplePhoto, legenda: "Depois", categoria: "depois" }),
+  }, memberLogin.body.token);
+  assert.equal(memberPhoto.status, 201);
+  assert.equal(memberPhoto.body.storage_provider, "local_volume");
+
+  const memberStatus = await request(`/ordens/${memberOrder.body.id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "em_andamento" }),
+  }, memberLogin.body.token);
+  assert.equal(memberStatus.status, 200);
+  assert.equal(memberStatus.body.status, "em_andamento");
+
+  const deniedOrderEdit = await request(`/ordens/${memberOrder.body.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ prioridade: "urgente" }),
+  }, memberLogin.body.token);
+  assert.equal(deniedOrderEdit.status, 403);
+
+  const productivity = await request("/dashboard/produtividade", {}, first.body.token);
+  assert.equal(productivity.status, 200);
+  assert.ok(productivity.body.membros.some((item) => item.nome === "Membro Um"));
+  assert.ok(productivity.body.atividades.some((item) => item.autor === "Membro Um"));
+
+  const deniedProductivity = await request("/dashboard/produtividade", {}, memberLogin.body.token);
+  assert.equal(deniedProductivity.status, 403);
 
   const deniedStockWrite = await request("/estoque", {
     method: "POST",

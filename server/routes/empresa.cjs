@@ -37,6 +37,43 @@ function inviteLink(req, token) {
   return `${baseUrl}/convite/${token}`;
 }
 
+async function ensureOperationalMember(empresaId, nome, cargo, avatar) {
+  const cleanName = clean(nome);
+  const cleanCargo = clean(cargo) || "Colaborador";
+  if (!cleanName) return null;
+
+  const current = await db.prepare(
+    `SELECT id FROM tripulacao
+     WHERE empresa_id = ? AND lower(nome) = lower(?)
+     ORDER BY id
+     LIMIT 1`,
+  ).get(empresaId, cleanName);
+  if (current) {
+    await db.prepare(
+      `UPDATE tripulacao
+       SET cargo = ?, funcao = ?, disponibilidade = 'disponivel', status = 'ok'
+       WHERE id = ? AND empresa_id = ?`,
+    ).run(cleanCargo, cleanCargo, current.id, empresaId);
+    return current.id;
+  }
+
+  const result = await db.prepare(
+    `INSERT INTO tripulacao
+     (empresa_id,nome,cargo,funcao,disponibilidade,status,avatar,observacao)
+     VALUES (?,?,?,?,?,?,?,?)`,
+  ).run(
+    empresaId,
+    cleanName,
+    cleanCargo,
+    cleanCargo,
+    "disponivel",
+    "ok",
+    avatar || cleanName.slice(0, 3).toUpperCase(),
+    "Criado a partir do acesso de colaborador",
+  );
+  return result.lastInsertRowid;
+}
+
 router.get("/", auth, async (req, res) => {
   const empresa = await db.prepare(
     "SELECT id, nome, slug, plano, ativo, trial_termina_em, criado_em FROM empresas WHERE id = ?",
@@ -186,6 +223,8 @@ router.post("/convites/:token/aceitar", async (req, res) => {
      WHERE u.id = ?`,
   ).get(result.lastInsertRowid);
 
+  await ensureOperationalMember(user.empresa_id, user.nome, user.cargo || user.perfil, user.avatar);
+
   const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
   const { senha: _senha, ...safeUser } = user;
   return res.status(201).json({ token, user: safeUser });
@@ -223,6 +262,13 @@ router.post("/membros", auth, canManage, requireLimite("usuarios"), async (req, 
     cargo,
   );
 
+  await ensureOperationalMember(
+    req.usuario.empresa_id,
+    nome,
+    cargo || profileLabelsForServer(perfil),
+    perfil.slice(0, 3).toUpperCase(),
+  );
+
   return res.status(201).json({
     id: result.lastInsertRowid,
     nome,
@@ -232,6 +278,16 @@ router.post("/membros", auth, canManage, requireLimite("usuarios"), async (req, 
     cargo,
   });
 });
+
+function profileLabelsForServer(perfil) {
+  const labels = {
+    gestor: "Gestao",
+    tecnico: "Tecnico",
+    marinharia: "Marinharia",
+    marinheiro: "Marinheiro",
+  };
+  return labels[perfil] || "Colaborador";
+}
 
 router.put("/membros/:id/papel", auth, canManage, async (req, res) => {
   const papel = req.body.papel;

@@ -46,6 +46,25 @@ npm run dev
 npm run build
 ```
 
+## 📸 Storage de fotos
+
+As fotos enviadas para OS e embarcações são compactadas no navegador e salvas pelo backend como arquivos em `/uploads`. O banco guarda apenas a URL, provider, chave e tamanho.
+
+Variáveis úteis:
+
+```bash
+# Pasta persistente para fotos. Em produção, use um Railway Volume ou storage montado.
+BORDO_UPLOAD_DIR=/data/uploads
+
+# Opcional: URL pública externa, caso as fotos estejam em CDN/S3/Supabase.
+BORDO_UPLOAD_BASE_URL=https://cdn.exemplo.com/uploads
+
+# Limite do arquivo decodificado no servidor.
+BORDO_MAX_PHOTO_BYTES=900000
+```
+
+Em Railway, configure um Volume persistente e aponte `BORDO_UPLOAD_DIR` para o caminho montado. Sem volume, os arquivos podem ser perdidos em redeploy.
+
 ## 📂 Estrutura
 
 ```

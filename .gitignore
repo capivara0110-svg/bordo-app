@@ -10,5 +10,6 @@ server/*.db
 server/*.db-shm
 server/*.db-wal
 server/backups/
+server/uploads/
 server/idx_*
 server/*_tmp.js

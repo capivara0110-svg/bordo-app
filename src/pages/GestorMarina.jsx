@@ -141,6 +141,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [alertasOperacao, setAlertasOperacao] = useState([]);
   const [auditoria, setAuditoria] = useState([]);
   const [errosMonitoramento, setErrosMonitoramento] = useState([]);
+  const [produtividade, setProdutividade] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [orderForm, setOrderForm] = useState(emptyOrder);
@@ -197,7 +198,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
       setLoading(true);
       setError("");
       try {
-        const [dash, ord, trip, ber, cli, emb, agd, modelos, alertas, logs, erros] = await Promise.all([
+        const [dash, ord, trip, ber, cli, emb, agd, modelos, alertas, logs, erros, prod] = await Promise.all([
           api.dashboard.dados(),
           api.ordens.listar(),
           api.tripulacao.listar(),
@@ -209,6 +210,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
           api.embarcacoes.alertas(),
           api.auditoria.listar(),
           api.monitoramento.erros(),
+          api.dashboard.produtividade(),
         ]);
         setDashboard(dash);
         setOrdens(ord);
@@ -221,6 +223,7 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
         setAlertasOperacao(alertas);
         setAuditoria(logs);
         setErrosMonitoramento(erros);
+        setProdutividade(prod);
       } catch (err) {
         console.error("Erro ao carregar dashboard:", err);
         setError(err.message || "Nao foi possivel carregar o painel");
@@ -1252,6 +1255,8 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
 
             {teamMessage && <InlineMessage tone={teamMessage.includes("sucesso") ? "success" : "error"}>{teamMessage}</InlineMessage>}
 
+            <ProductivityPanel produtividade={produtividade} />
+
             <form onSubmit={saveTeamMember} style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                 <div>
@@ -1783,6 +1788,138 @@ function InlineMessage({ tone, children }) {
       {children}
     </div>
   );
+}
+
+function ProductivityPanel({ produtividade }) {
+  if (!produtividade) {
+    return (
+      <section style={{ ...panelStyle, display: "grid", gap: 10, marginBottom: 16 }}>
+        <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>Produtividade</div>
+        <StateMessage title="Carregando produtividade" body="Buscando atividades recentes da equipe." compact />
+      </section>
+    );
+  }
+
+  const metrics = [
+    ["Colaboradores", produtividade.resumo?.colaboradores || 0, C.aqua],
+    ["OS abertas", produtividade.resumo?.ordens_abertas || 0, C.gold],
+    ["OS concluidas", produtividade.resumo?.ordens_concluidas || 0, C.green],
+    ["Registros", produtividade.resumo?.execucoes || 0, C.purple],
+  ];
+
+  return (
+    <section style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 900 }}>
+            Produtividade da equipe
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 4 }}>
+            Ultimos {produtividade.periodo_dias || 30} dias: OS, tarefas, fotos e observacoes registradas.
+          </div>
+        </div>
+        <span style={{ ...tagStyle, color: C.aqua }}>Operacao real</span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+        {metrics.map(([label, value, color]) => (
+          <div key={label} style={miniMetricStyle}>
+            <span style={{ color, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1 }}>{label}</span>
+            <strong style={{ color: C.white, fontSize: 20 }}>{value}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1.4 }}>
+          Ranking por colaborador
+        </div>
+        {produtividade.membros?.length === 0 && (
+          <StateMessage title="Sem equipe operacional" body="Cadastre colaboradores para acompanhar produtividade." compact />
+        )}
+        {(produtividade.membros || []).slice(0, 8).map((member) => {
+          const progress = member.tarefas_total
+            ? Math.round((member.tarefas_feitas / member.tarefas_total) * 100)
+            : 0;
+          return (
+            <article key={member.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  display: "grid",
+                  placeItems: "center",
+                  background: "rgba(35,210,226,0.14)",
+                  color: C.aqua,
+                  fontWeight: 900,
+                  flexShrink: 0,
+                }}>
+                  {member.avatar || member.nome.slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <div style={{ color: C.white, fontSize: 13, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {member.nome}
+                    </div>
+                    <StatusBadge status={member.status} />
+                  </div>
+                  <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 11, marginTop: 3 }}>
+                    {member.funcao || "Colaborador"} · {member.ordens_abertas} aberta(s) · {member.ordens_concluidas} concluida(s)
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginTop: 10 }}>
+                <SmallStat label="Tarefas" value={`${member.tarefas_feitas}/${member.tarefas_total}`} />
+                <SmallStat label="Fotos" value={member.fotos} />
+                <SmallStat label="Registros" value={member.execucoes} />
+                <SmallStat label="OS" value={member.ordens_atribuidas} />
+              </div>
+              <div style={{ height: 5, borderRadius: 999, background: "rgba(255,255,255,0.10)", overflow: "hidden", marginTop: 10 }}>
+                <div style={{ height: "100%", width: `${Math.min(progress, 100)}%`, borderRadius: 999, background: progress >= 80 ? C.green : C.aqua }} />
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1.4 }}>
+          Ultimas atividades
+        </div>
+        {(produtividade.atividades || []).length === 0 && (
+          <StateMessage title="Sem registros recentes" body="Quando a equipe registrar observacoes na OS, elas aparecem aqui." compact />
+        )}
+        {(produtividade.atividades || []).slice(0, 8).map((atividade) => (
+          <div key={atividade.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10 }}>
+            <div style={{ color: C.white, fontSize: 12, fontWeight: 900 }}>
+              {atividade.autor} · {atividade.codigo}
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.60)", fontSize: 12, marginTop: 4, lineHeight: 1.4 }}>
+              {atividade.descricao}
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.34)", fontSize: 10, marginTop: 5 }}>
+              {atividade.embarcacao || "Servico avulso"} · {formatDateTime(atividade.criado_em)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SmallStat({ label, value }) {
+  return (
+    <div style={{ background: "rgba(255,255,255,0.045)", borderRadius: 9, padding: 8 }}>
+      <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 9, fontWeight: 900, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ color: C.white, fontSize: 13, fontWeight: 900, marginTop: 3 }}>{value}</div>
+    </div>
+  );
+}
+
+function formatDateTime(value) {
+  if (!value) return "agora";
+  return String(value).slice(0, 16).replace("T", " ");
 }
 
 function BudgetPanel({ os, draft, message, onDraft, onAddItem, onSaveAdjustments, onRemoveItem, onApprove }) {

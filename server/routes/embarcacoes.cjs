@@ -5,6 +5,7 @@ const db = require("../database.cjs");
 const auth = require("../middleware.cjs");
 const { requireAccess } = require("../middleware.cjs");
 const { audit } = require("../audit.cjs");
+const { preparePhotoPayload } = require("../photo-storage.cjs");
 
 const router = express.Router();
 const canManage = requireAccess({
@@ -37,27 +38,6 @@ async function ensureQrToken(embarcacao) {
     "UPDATE embarcacoes SET qr_token = ? WHERE id = ? AND empresa_id = ?",
   ).run(token, embarcacao.id, embarcacao.empresa_id);
   return token;
-}
-
-function cleanPhotoPayload(body) {
-  const url = clean(body.url);
-  if (!url) return { erro: "Foto obrigatoria" };
-  if (!url.startsWith("data:image/") && !/^https?:\/\//i.test(url)) {
-    return { erro: "Formato de foto invalido" };
-  }
-  if (url.length > 750000) return { erro: "Foto muito grande" };
-  const categoria = allowedPhotoCategories.includes(body.categoria) ? body.categoria : "geral";
-  const dataUrlMatch = url.match(/^data:([^;]+);base64,(.+)$/);
-  const storageProvider = url.startsWith("data:image/") ? "data_url_mvp" : "external_url";
-  return {
-    url,
-    categoria,
-    legenda: clean(body.legenda).slice(0, 180),
-    storage_provider: storageProvider,
-    storage_key: storageProvider === "external_url" ? clean(body.storage_key).slice(0, 240) : "",
-    mime_type: dataUrlMatch?.[1] || clean(body.mime_type).slice(0, 80),
-    tamanho_bytes: dataUrlMatch?.[2] ? Math.ceil((dataUrlMatch[2].length * 3) / 4) : Number(body.tamanho_bytes) || 0,
-  };
 }
 
 async function getEmbarcacao(id, empresaId) {
@@ -164,7 +144,12 @@ router.post("/:id/fotos", auth, canManage, async (req, res) => {
   const embarcacao = await getEmbarcacao(req.params.id, req.usuario.empresa_id);
   if (!embarcacao) return res.status(404).json({ erro: "Embarcacao nao encontrada" });
 
-  const foto = cleanPhotoPayload(req.body);
+  const foto = await preparePhotoPayload(req.body, {
+    empresaId: req.usuario.empresa_id,
+    tipo: "embarcacao",
+    referenciaId: req.params.id,
+    allowedCategories: allowedPhotoCategories,
+  });
   if (foto.erro) return res.status(400).json({ erro: foto.erro });
 
   const result = await db.prepare(
