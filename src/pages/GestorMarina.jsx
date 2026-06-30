@@ -149,6 +149,8 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderMessage, setOrderMessage] = useState("");
   const [orderFilter, setOrderFilter] = useState("todos");
+  const [orderSection, setOrderSection] = useState("ativas");
+  const [expandedOrders, setExpandedOrders] = useState({});
   const [orderSearch, setOrderSearch] = useState("");
   const [newTask, setNewTask] = useState({});
   const [executionDraft, setExecutionDraft] = useState({});
@@ -1308,22 +1310,42 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
           </div>
         );
 
-      case "ordens":
+      case "ordens": {
+        const orderSections = [
+          { id: "ativas", label: "Abertas", statuses: ["aguardando", "em_andamento"] },
+          { id: "aguardando", label: "Aguardando", statuses: ["aguardando"] },
+          { id: "em_andamento", label: "Em andamento", statuses: ["em_andamento"] },
+          { id: "finalizadas", label: "Finalizadas", statuses: ["concluida", "cancelada"] },
+          { id: "todas", label: "Todas", statuses: null },
+        ];
+        const activeSection = orderSections.find((section) => section.id === orderSection) || orderSections[0];
+        const visibleOrders = activeSection.statuses
+          ? filteredOrders.filter((os) => activeSection.statuses.includes(os.status))
+          : filteredOrders;
+        const sectionCount = (section) => (
+          section.statuses
+            ? filteredOrders.filter((os) => section.statuses.includes(os.status)).length
+            : filteredOrders.length
+        );
+
         return (
           <div className="bordo-page-body">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Ordens</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{filteredOrders.length} de {ordens.length} ordens</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>{visibleOrders.length} de {ordens.length} ordens</div>
+                <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 4 }}>
+                  Abra uma nova OS ou acompanhe abertas, em andamento e finalizadas.
+                </div>
               </div>
               <button type="button" onClick={startNewOrder} style={primarySmallButton}>+ Nova OS</button>
             </div>
 
             {orderMessage && <InlineMessage tone={orderMessage.includes("sucesso") ? "success" : "error"}>{orderMessage}</InlineMessage>}
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 12 }}>
               <input
-                placeholder="Buscar por codigo, barco, cliente..."
+                placeholder="Buscar por codigo, barco, cliente, local..."
                 value={orderSearch}
                 onChange={(event) => setOrderSearch(event.target.value)}
                 style={inputStyle}
@@ -1331,6 +1353,28 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
               <select value={orderFilter} onChange={(event) => setOrderFilter(event.target.value)} style={inputStyle}>
                 {statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 12 }}>
+              {orderSections.map((section) => {
+                const active = activeSection.id === section.id;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setOrderSection(section.id)}
+                    style={{
+                      ...ghostButton,
+                      flex: "0 0 auto",
+                      borderColor: active ? C.aqua : "rgba(255,255,255,0.12)",
+                      background: active ? "rgba(35,210,226,0.16)" : ghostButton.background,
+                      color: active ? C.white : ghostButton.color,
+                    }}
+                  >
+                    {section.label} ({sectionCount(section)})
+                  </button>
+                );
+              })}
             </div>
 
             {photoPanel?.tipo === "ordem" && (
@@ -1467,8 +1511,8 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
             )}
 
             <div className="bordo-list-grid">
-            {filteredOrders.length === 0 && <StateMessage title="Nenhuma OS encontrada" body="Crie uma nova ordem ou ajuste os filtros." compact />}
-            {filteredOrders.map(os => (
+            {visibleOrders.length === 0 && <StateMessage title="Nenhuma OS encontrada" body="Crie uma nova ordem ou ajuste os filtros." compact />}
+            {visibleOrders.map(os => (
               <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                   <div>
@@ -1501,7 +1545,14 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                   <button type="button" onClick={() => openPhotoPanel("ordem", os)} style={ghostButton}>Fotos ({Number(os.fotos || 0)})</button>
                   <button type="button" onClick={() => startEditOrder(os)} style={ghostButton}>Editar</button>
                 </div>
-                <button type="button" onClick={() => openReportPanel(os)} style={{ ...ghostButton, width: "100%", marginTop: 8 }}>Relatorio da OS</button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                  <button type="button" onClick={() => setExpandedOrders((current) => ({ ...current, [os.id]: !current[os.id] }))} style={ghostButton}>
+                    {expandedOrders[os.id] ? "Ocultar detalhes" : "Ver detalhes"}
+                  </button>
+                  <button type="button" onClick={() => openReportPanel(os)} style={ghostButton}>Relatorio</button>
+                </div>
+                {expandedOrders[os.id] && (
+                <>
                 <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
                     <span>Tarefas</span>
@@ -1574,11 +1625,14 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                     </div>
                   )}
                 </div>
+                </>
+                )}
               </div>
             ))}
             </div>
           </div>
         );
+      }
 
       case "bercos":
         return (
