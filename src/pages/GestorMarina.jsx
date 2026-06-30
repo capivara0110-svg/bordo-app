@@ -1912,7 +1912,20 @@ function ReportPhotos({ title, fotos }) {
 
 function HistoryPanel({ title, subtitle, ordens, onClose }) {
   return (
-    <section style={{ ...panelStyle, display: "grid", gap: 12, marginBottom: 16 }}>
+    <section style={{
+      ...panelStyle,
+      position: "fixed",
+      left: 12,
+      right: 12,
+      bottom: 84,
+      zIndex: 40,
+      display: "grid",
+      gap: 12,
+      maxHeight: "70vh",
+      overflowY: "auto",
+      boxShadow: "0 24px 80px rgba(0,0,0,0.55)",
+      borderColor: "rgba(35, 210, 226, 0.35)",
+    }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div>
           <div style={{ fontFamily: fonts.display, color: C.white, fontWeight: 800 }}>{title}</div>
