@@ -371,6 +371,17 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
     setOrderMessage("");
   };
 
+  const startManualServiceOrder = () => {
+    setOrderForm((current) => ({
+      ...current,
+      cliente_id: "",
+      embarcacao_id: "",
+      embarcacao: current.embarcacao || "Servico avulso",
+    }));
+    setOrderMessage("OS avulsa ativada. Voce pode preencher sem vincular barco cadastrado.");
+    setTimeout(() => document.querySelector("[data-order-boat-name]")?.focus(), 80);
+  };
+
   const selectOrderBoat = (id) => {
     const embarcacao = embarcacoes.find((item) => String(item.id) === String(id));
     const cliente = embarcacao?.cliente_id
@@ -1354,13 +1365,16 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                       {editingOrderId ? "Editar ordem de servico" : "Nova ordem de servico"}
                     </div>
                     <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 3 }}>
-                      Registre embarcacao, cliente, responsavel e tarefas.
+                      Vincule um barco cadastrado ou crie uma OS avulsa preenchendo manualmente.
                     </div>
                   </div>
                   <button type="button" onClick={closeOrderForm} style={ghostButton}>Cancelar</button>
                 </div>
+                <button type="button" onClick={startManualServiceOrder} style={{ ...ghostButton, width: "100%" }}>
+                  Criar OS avulsa sem vincular barco
+                </button>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-                  <Field label="Barco cadastrado">
+                  <Field label="Barco cadastrado (opcional)">
                     <select value={orderForm.embarcacao_id} onChange={(event) => selectOrderBoat(event.target.value)} style={inputStyle}>
                       <option value="">Digitar manualmente</option>
                       {embarcacoes.map((embarcacao) => (
@@ -1376,14 +1390,14 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
                       {modelosOS.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.label}</option>)}
                     </select>
                   </Field>
-                  <Field label="Cliente cadastrado">
+                  <Field label="Cliente cadastrado (opcional)">
                     <select value={orderForm.cliente_id} onChange={(event) => selectOrderClient(event.target.value)} style={inputStyle}>
                       <option value="">Digitar manualmente</option>
                       {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome}</option>)}
                     </select>
                   </Field>
-                  <Field label="Embarcacao">
-                    <input required value={orderForm.embarcacao} onChange={(event) => updateOrderForm("embarcacao", event.target.value)} style={inputStyle} />
+                  <Field label="Embarcacao ou servico avulso">
+                    <input data-order-boat-name value={orderForm.embarcacao} onChange={(event) => updateOrderForm("embarcacao", event.target.value)} style={inputStyle} placeholder="Ex.: Jet Yamaha VX ou Servico avulso" />
                   </Field>
                   <Field label="Cliente">
                     <input value={orderForm.cliente} onChange={(event) => updateOrderForm("cliente", event.target.value)} style={inputStyle} />

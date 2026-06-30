@@ -321,17 +321,13 @@ router.post("/", auth, canManage, requirePlanoAtivo, requireLimite("ordensMes"),
     || serviceTemplates[clean(tipo).toLowerCase()];
   const selectedCliente = await resolveCliente(req.body.cliente_id, req.usuario.empresa_id);
   const selectedEmbarcacao = await resolveEmbarcacao(req.body.embarcacao_id, req.usuario.empresa_id);
-  const embarcacao = selectedEmbarcacao?.nome || clean(req.body.embarcacao);
+  const embarcacao = selectedEmbarcacao?.nome || clean(req.body.embarcacao) || "Servico avulso";
   const cliente = selectedCliente?.nome || selectedEmbarcacao?.cliente_nome || clean(req.body.cliente);
   const clienteId = selectedCliente?.id || selectedEmbarcacao?.cliente_id || null;
   const embarcacaoId = selectedEmbarcacao?.id || null;
   const selectedResponsavel = await resolveMembro(req.body.responsavel_id, req.usuario.empresa_id);
   const responsavelNome = selectedResponsavel?.nome || clean(responsavel);
   const responsavelId = selectedResponsavel?.id || null;
-
-  if (!embarcacao) {
-    return res.status(400).json({ erro: "Embarcacao obrigatoria" });
-  }
 
   const count = await db.prepare(
     "SELECT COUNT(*) AS total FROM ordens_servico WHERE empresa_id = ?",
@@ -396,7 +392,7 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
     : current.responsavel_id;
 
   const fields = {
-    embarcacao: selectedEmbarcacao?.nome || String(req.body.embarcacao ?? current.embarcacao).trim(),
+    embarcacao: selectedEmbarcacao?.nome || String(req.body.embarcacao ?? current.embarcacao).trim() || "Servico avulso",
     cliente: selectedCliente?.nome || selectedEmbarcacao?.cliente_nome || String(req.body.cliente ?? current.cliente ?? "").trim(),
     cliente_id: clienteId,
     embarcacao_id: embarcacaoId,
@@ -409,10 +405,6 @@ router.put("/:id", auth, canManage, requirePlanoAtivo, async (req, res) => {
     previsao: String(req.body.previsao ?? current.previsao ?? "").trim(),
     observacao: String(req.body.observacao ?? current.observacao ?? "").trim(),
   };
-
-  if (!fields.embarcacao) {
-    return res.status(400).json({ erro: "Embarcacao obrigatoria" });
-  }
 
   await db.prepare(
     `UPDATE ordens_servico
