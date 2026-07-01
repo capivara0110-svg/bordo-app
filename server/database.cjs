@@ -519,11 +519,16 @@ async function seed() {
   }
 
   const checklist = [
-    [1, "Seguranca", "Coletes salva-vidas verificados", 1],
-    [1, "Seguranca", "Sinalizadores dentro da validade", 1],
-    [1, "Seguranca", "Extintor de incendio verificado", 0],
-    [1, "Motor", "Nivel de oleo verificado", 1],
-    [1, "Motor", "Sistema de refrigeracao OK", 1],
+    [1, "Seguranca", "Coletes disponiveis para todos e em bom estado", 1],
+    [1, "Seguranca", "Extintores no lugar, carregados e dentro da validade", 1],
+    [1, "Seguranca", "Boia, cabo, kit primeiros socorros e sinalizadores acessiveis", 0],
+    [1, "Pre-servico", "OS lida: embarcacao, local, escopo e prioridade conferidos", 1],
+    [1, "Pre-servico", "Area isolada/protegida antes de iniciar o trabalho", 0],
+    [1, "Motor e eletrica", "Porão/casa de maquinas sem agua, oleo solto ou cheiro forte", 0],
+    [1, "Motor e eletrica", "Nivel de oleo, refrigeracao e vazamentos visiveis conferidos", 1],
+    [1, "Limpeza e acabamento", "Produto correto separado para casco, conves, inox ou estofado", 0],
+    [1, "Evidencias", "Foto antes do servico anexada quando fizer sentido", 0],
+    [1, "Encerramento", "Ferramentas recolhidas e area limpa", 0],
   ];
   for (const values of checklist) {
     await run(

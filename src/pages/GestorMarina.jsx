@@ -303,11 +303,13 @@ export default function GestorMarina({ profile, onLogout, onCompany }) {
   const shareReport = () => {
     if (!reportPanel?.ordem) return;
     const ordem = reportPanel.ordem;
+    const empresaNome = reportPanel.empresa?.nome || profile?.company?.name || "";
     const total = reportPanel.orcamento ? money(reportPanel.orcamento.total) : "";
     const tarefas = reportPanel.tarefas || [];
     const feitas = tarefas.filter((item) => Number(item.done)).length;
     const texto = [
       `BORDO - Relatorio da ${ordem.codigo}`,
+      empresaNome ? `Empresa: ${empresaNome}` : "",
       `Embarcacao/servico: ${ordem.embarcacao}`,
       ordem.cliente ? `Cliente: ${ordem.cliente}` : "",
       ordem.local ? `Local: ${ordem.local}` : "",
@@ -1999,8 +2001,9 @@ function BudgetPanel({ os, draft, message, onDraft, onAddItem, onSaveAdjustments
 }
 
 function ReportPanel({ report, message, acceptName, onAcceptName, onAccept, onPrint, onShare, onClose }) {
-  const { ordem, cliente, embarcacao, tarefas, fotos_por_tipo: fotosPorTipo, orcamento } = report;
+  const { empresa, ordem, cliente, embarcacao, tarefas, fotos_por_tipo: fotosPorTipo, orcamento } = report;
   const taskDone = tarefas.filter((item) => Number(item.done)).length;
+  const empresaNome = empresa?.nome || "";
 
   return (
     <section className="bordo-report-panel" style={{ ...panelStyle, display: "grid", gap: 14, marginBottom: 16 }}>
@@ -2023,6 +2026,16 @@ function ReportPanel({ report, message, acceptName, onAcceptName, onAccept, onPr
           <div>
             <div style={{ fontFamily: fonts.display, fontWeight: 900, fontSize: 24, color: "#0A2540" }}>BORDO.</div>
             <div style={{ fontSize: 12, color: "#637083" }}>Relatorio de ordem de servico</div>
+            {empresaNome && (
+              <div style={{ marginTop: 6, fontSize: 13, color: "#0A2540", fontWeight: 800 }}>
+                {empresaNome}
+              </div>
+            )}
+            {empresaNome && (
+              <div style={{ fontSize: 11, color: "#637083", marginTop: 2 }}>
+                Empresa cadastrada no BORDO
+              </div>
+            )}
           </div>
           <div style={{ textAlign: "right", fontSize: 12, color: "#637083" }}>
             <strong style={{ color: "#0A2540" }}>{ordem.codigo}</strong><br />

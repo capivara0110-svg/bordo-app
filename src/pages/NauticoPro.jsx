@@ -1,15 +1,61 @@
 ﻿import React, { useState, useEffect } from "react";
 import { C, fonts } from "../styles/theme.js";
-import { api } from "../services/api.js";
+import { api, syncOfflineQueue } from "../services/api.js";
 import { PERFIS_SISTEMA } from "../data/mock.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 import { compressImageFile } from "../utils/photos.js";
 
+function dateKey(value) {
+  return String(value || "").slice(0, 10);
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isClosedOrder(os) {
+  return os.status === "concluida" || os.status === "cancelada";
+}
+
+function orderProgress(os) {
+  const tasks = os.itens || [];
+  const done = tasks.filter((item) => Number(item.done)).length;
+  return {
+    done,
+    total: tasks.length,
+    percent: tasks.length ? Math.round((done / tasks.length) * 100) : 0,
+  };
+}
+
+function orderWeight(os) {
+  const priority = { urgente: 0, alta: 1, normal: 2, media: 3, baixa: 4 }[os.prioridade] ?? 3;
+  const due = dateKey(os.previsao) || "9999-99-99";
+  const status = os.status === "em_andamento" ? 0 : os.status === "aguardando" ? 1 : 2;
+  return `${isClosedOrder(os) ? 9 : status}-${priority}-${due}`;
+}
+
+function sortOrdersForWork(items) {
+  return [...items].sort((a, b) => orderWeight(a).localeCompare(orderWeight(b)));
+}
+
 export default function NauticoPro({ profile, onLogout }) {
   const fullProfile = PERFIS_SISTEMA.find(p => p.id === profile.id) || profile;
-  const initialTab = fullProfile.tabs?.some((item) => item.id === "ordens")
-    ? fullProfile.tabs[0].id
-    : "ordens";
+  const workerTabs = fullProfile.id === "marinheiro"
+    ? [
+        { id: "hoje", icon: "⚓", label: "Hoje" },
+        { id: "diario", icon: "📋", label: "Diário" },
+        { id: "checklist", icon: "✅", label: "Checklist" },
+        { id: "tripulacao", icon: "👥", label: "Equipe" },
+        { id: "estoque", icon: "📦", label: "Estoque" },
+      ]
+    : [
+        { id: "hoje", icon: "⚓", label: "Hoje" },
+        { id: "ordens", icon: "🔧", label: "Serviços" },
+        { id: "fotos", icon: "📷", label: "Fotos" },
+        { id: "diario", icon: "📋", label: "Registro" },
+        { id: "checklist", icon: "✅", label: "Check" },
+      ];
+  const initialTab = workerTabs[0].id;
   const [tab, setTab] = useState(initialTab);
 
   // Estados dos dados
@@ -29,16 +75,12 @@ export default function NauticoPro({ profile, onLogout }) {
   const [photoSaving, setPhotoSaving] = useState(false);
   const [orderMessage, setOrderMessage] = useState("");
   const [executionNotes, setExecutionNotes] = useState({});
-
-  const baseTabs = fullProfile.tabs || [
-    { id: "diario", icon: "📋", label: "Diário" },
-    { id: "checklist", icon: "✅", label: "Check-list" },
-    { id: "tripulacao", icon: "👥", label: "Tripulação" },
-    { id: "estoque", icon: "📦", label: "Estoque" },
-  ];
-  const tabs = baseTabs.some((item) => item.id === "ordens")
-    ? baseTabs
-    : [{ id: "ordens", icon: "🔧", label: "Serviços" }, ...baseTabs].slice(0, 5);
+  const [orderView, setOrderView] = useState("abertas");
+  const [isOnline, setIsOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const [syncInfo, setSyncInfo] = useState({ synced: 0, remaining: 0 });
+  const tabs = workerTabs;
+  const checklistDone = checklist.filter((item) => item.feito).length;
+  const checklistProgress = checklist.length ? Math.round((checklistDone / checklist.length) * 100) : 0;
 
   // Carrega dados ao abrir
   useEffect(() => {
@@ -63,6 +105,23 @@ export default function NauticoPro({ profile, onLogout }) {
       setLoading(false);
     }
     loadData();
+  }, []);
+
+  useEffect(() => {
+    const updateConnection = async () => {
+      setIsOnline(navigator.onLine);
+      if (navigator.onLine) {
+        const result = await syncOfflineQueue().catch(() => ({ synced: 0, remaining: 0 }));
+        setSyncInfo(result);
+      }
+    };
+    updateConnection();
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    return () => {
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+    };
   }, []);
 
   // ─── AÇÕES ─────────────────────────────────────────────
@@ -136,6 +195,15 @@ export default function NauticoPro({ profile, onLogout }) {
     } catch (err) {
       setOrderMessage(err.message || "Nao foi possivel atualizar a OS.");
     }
+  };
+
+  const finishOrder = async (os) => {
+    const tasks = os.itens || [];
+    const openTasks = tasks.filter((item) => !Number(item.done)).length;
+    if (openTasks > 0 && !window.confirm(`Ainda existem ${openTasks} tarefa(s) pendente(s). Concluir mesmo assim?`)) {
+      return;
+    }
+    await updateOrderStatus(os.id, "concluida");
   };
 
   const registerExecution = async (orderId) => {
@@ -213,7 +281,20 @@ export default function NauticoPro({ profile, onLogout }) {
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{fullProfile.user?.role} · {fullProfile.user?.vessel}</div>
         </div>
       </div>
-      <button onClick={onLogout} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, padding: "6px 12px", color: "rgba(255,255,255,0.5)", fontSize: 12, cursor: "pointer" }}>Sair</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{
+          background: isOnline ? "rgba(45,212,191,0.12)" : "rgba(239,68,68,0.12)",
+          color: isOnline ? C.green : C.rust,
+          border: `1px solid ${isOnline ? "rgba(45,212,191,0.25)" : "rgba(239,68,68,0.25)"}`,
+          borderRadius: 999,
+          padding: "5px 8px",
+          fontSize: 10,
+          fontWeight: 900,
+        }}>
+          {isOnline ? (syncInfo.remaining ? `${syncInfo.remaining} pend.` : "Online") : "Offline"}
+        </span>
+        <button onClick={onLogout} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 8, padding: "6px 12px", color: "rgba(255,255,255,0.5)", fontSize: 12, cursor: "pointer" }}>Sair</button>
+      </div>
     </div>
   );
 
@@ -236,6 +317,94 @@ export default function NauticoPro({ profile, onLogout }) {
     if (loading) return <div style={{ padding: 40, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Carregando...</div>;
 
     switch (tab) {
+      case "hoje": {
+        const today = todayKey();
+        const openOrders = sortOrdersForWork(ordens.filter((os) => !isClosedOrder(os)));
+        const dueToday = openOrders.filter((os) => dateKey(os.previsao) === today);
+        const overdue = openOrders.filter((os) => dateKey(os.previsao) && dateKey(os.previsao) < today);
+        const urgent = openOrders.filter((os) => ["urgente", "alta"].includes(os.prioridade));
+        const nextOrders = openOrders.slice(0, 4);
+
+        return (
+          <div className="bordo-page-body">
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Rotina de hoje</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: C.white, fontFamily: fonts.display }}>
+                {fullProfile.user?.name || "Trabalhador nautico"}
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, marginTop: 4 }}>
+                Prioridade, prazo, checklist e foto no mesmo lugar.
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
+              <MiniMetric label="Hoje" value={dueToday.length} color={C.aqua} compact />
+              <MiniMetric label="Atraso" value={overdue.length} color={overdue.length ? C.rust : C.green} compact />
+              <MiniMetric label="Urgente" value={urgent.length} color={urgent.length ? C.gold : C.green} compact />
+            </div>
+
+            {syncInfo.synced > 0 && (
+              <div style={{ color: C.green, background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
+                {syncInfo.synced} registro(s) offline sincronizado(s).
+              </div>
+            )}
+
+            {photoPanel && (
+              <PhotoPanel
+                panel={photoPanel}
+                form={photoForm}
+                message={photoMessage}
+                saving={photoSaving}
+                onClose={closePhotoPanel}
+                onSubmit={savePhoto}
+                onFile={updatePhotoFile}
+                onChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
+              />
+            )}
+
+            {openOrders.length === 0 && (
+              <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, color: "rgba(255,255,255,0.58)", fontSize: 13, lineHeight: 1.5 }}>
+                Sem servico aberto para voce agora. Use diario e checklist quando precisar registrar algo da embarcacao ou da rotina.
+              </div>
+            )}
+
+            {nextOrders.length > 0 && (
+              <div style={{ display: "grid", gap: 10 }}>
+                {nextOrders.map((os) => {
+                  const progress = orderProgress(os);
+                  const due = dateKey(os.previsao);
+                  const dueTone = due && due < today ? C.rust : due === today ? C.gold : "rgba(255,255,255,0.42)";
+                  return (
+                    <div key={os.id} style={{ background: "rgba(255,255,255,0.055)", border: `1px solid ${os.prioridade === "urgente" ? "rgba(255,184,77,0.38)" : "rgba(255,255,255,0.08)"}`, borderRadius: 14, padding: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                        <div>
+                          <div style={{ color: C.white, fontWeight: 900, fontSize: 14 }}>{os.codigo}</div>
+                          <div style={{ color: "rgba(255,255,255,0.46)", fontSize: 12, marginTop: 3 }}>{os.embarcacao} · {os.cliente || "Sem cliente"}</div>
+                          {os.local && <div style={{ color: "rgba(255,255,255,0.36)", fontSize: 11, marginTop: 3 }}>Local: {os.local}</div>}
+                        </div>
+                        <StatusBadge status={os.status} />
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                        <span style={tagStyle}>{os.tipo || "Servico"}</span>
+                        <span style={{ ...tagStyle, color: os.prioridade === "urgente" ? C.gold : "rgba(255,255,255,0.5)" }}>{os.prioridade || "normal"}</span>
+                        <span style={{ ...tagStyle, color: dueTone }}>Prazo: {due || "sem data"}</span>
+                        <span style={tagStyle}>{progress.done}/{progress.total} tarefas</span>
+                        <span style={tagStyle}>{Number(os.fotos || 0)} foto(s)</span>
+                      </div>
+                      <p style={{ color: "rgba(255,255,255,0.62)", fontSize: 12, lineHeight: 1.45, margin: "10px 0" }}>{os.descricao || "Sem descricao."}</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <button type="button" onClick={() => setTab("ordens")} style={primaryButton}>Abrir servico</button>
+                        <button type="button" onClick={() => openPhotoPanel(os)} style={ghostButton}>Foto rapida</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      }
+
       case "diario":
         return (
           <div className="bordo-page-body">
@@ -287,25 +456,49 @@ export default function NauticoPro({ profile, onLogout }) {
         );
 
       case "checklist":
+        const knownChecklistValues = checklistGroups.map((group) => group.value);
+        const extraChecklistGroups = [...new Set(checklist.map((item) => item.categoria))]
+          .filter((categoria) => categoria && !knownChecklistValues.includes(categoria))
+          .map((categoria) => ({ value: categoria, label: categoria, desc: "Itens criados pela equipe." }));
+        const visibleChecklistGroups = [...checklistGroups, ...extraChecklistGroups];
         return (
           <div className="bordo-page-body">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div>
-                <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Segurança</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>Check-list</div>
+                <div style={{ fontSize: 11, color: C.aqua, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>Rotina operacional</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.white, fontFamily: fonts.display }}>Checklist de campo</div>
+                <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 12, marginTop: 4 }}>
+                  {checklistDone}/{checklist.length} itens prontos antes de encerrar o dia.
+                </div>
               </div>
               <button onClick={() => setShowModal("checklist")} style={{ background: C.aqua, border: "none", borderRadius: 10, padding: "10px 16px", color: C.white, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>+ Item</button>
             </div>
-            {["Segurança", "Motor", "Navegação", "Comunicação"].map(cat => {
-              const items = checklist.filter(i => i.categoria === cat);
+            <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: 12, marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.62)", fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
+                <span>Progresso geral</span>
+                <span>{checklistProgress}%</span>
+              </div>
+              <div style={{ height: 7, borderRadius: 99, background: "rgba(255,255,255,0.10)" }}>
+                <div style={{ width: `${checklistProgress}%`, height: "100%", borderRadius: 99, background: checklistProgress === 100 ? C.green : C.aqua }} />
+              </div>
+            </div>
+            {visibleChecklistGroups.map(group => {
+              const items = checklist.filter(i => i.categoria === group.value);
               const done = items.filter(i => i.feito).length;
-              if (items.length === 0) return null;
               return (
-                <div key={cat} style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>{cat}</span>
-                    <span style={{ fontSize: 11, color: C.aqua, fontWeight: 700 }}>{done}/{items.length}</span>
+                <div key={group.value} style={{ marginBottom: 16, background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 8 }}>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: C.white }}>{group.label}</span>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.38)", marginTop: 3, lineHeight: 1.35 }}>{group.desc}</div>
+                    </div>
+                    <span style={{ fontSize: 11, color: done === items.length && items.length ? C.green : C.aqua, fontWeight: 900, whiteSpace: "nowrap" }}>{done}/{items.length}</span>
                   </div>
+                  {items.length === 0 && (
+                    <div style={{ color: "rgba(255,255,255,0.30)", fontSize: 12, lineHeight: 1.4 }}>
+                      Nenhum item nesta categoria.
+                    </div>
+                  )}
                   {items.map(i => (
                     <div key={i.id} onClick={() => toggleChecklist(i.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer" }}>
                       <div style={{
@@ -329,10 +522,9 @@ export default function NauticoPro({ profile, onLogout }) {
                 <select value={formData.categoria || ""} onChange={e => setFormData({ ...formData, categoria: e.target.value })}
                   style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: C.white, fontSize: 14, marginBottom: 12 }}>
                   <option value="">Categoria</option>
-                  <option value="Segurança">Segurança</option>
-                  <option value="Motor">Motor</option>
-                  <option value="Navegação">Navegação</option>
-                  <option value="Comunicação">Comunicação</option>
+                  {checklistGroups.map((group) => (
+                    <option key={group.value} value={group.value}>{group.label}</option>
+                  ))}
                 </select>
                 <input placeholder="Item..." value={formData.item || ""} onChange={e => setFormData({ ...formData, item: e.target.value })}
                   style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: C.white, fontSize: 14, marginBottom: 16 }} />
@@ -403,8 +595,13 @@ export default function NauticoPro({ profile, onLogout }) {
         );
 
       case "ordens":
-        const openOrders = ordens.filter((os) => os.status !== "concluida" && os.status !== "cancelada");
+        const openOrders = sortOrdersForWork(ordens.filter((os) => !isClosedOrder(os)));
         const doneOrders = ordens.filter((os) => os.status === "concluida");
+        const visibleOrders = orderView === "concluidas"
+          ? doneOrders
+          : orderView === "todas"
+            ? sortOrdersForWork(ordens)
+            : openOrders;
         return (
           <div className="bordo-page-body">
             <div style={{ marginBottom: 14 }}>
@@ -417,6 +614,22 @@ export default function NauticoPro({ profile, onLogout }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
               <MiniMetric label="Abertas" value={openOrders.length} color={C.aqua} />
               <MiniMetric label="Finalizadas" value={doneOrders.length} color={C.green} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
+              {[
+                ["abertas", "Abertas"],
+                ["concluidas", "Concluidas"],
+                ["todas", "Todas"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setOrderView(value)}
+                  style={orderView === value ? primaryButton : ghostButton}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             {orderMessage && <div style={{ color: C.rust, background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 10, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>{orderMessage}</div>}
             {photoPanel && (
@@ -436,14 +649,20 @@ export default function NauticoPro({ profile, onLogout }) {
                 Nenhum servico atribuido para voce agora. Quando o gestor colocar seu nome como responsavel ou auxiliar, a OS aparece aqui.
               </div>
             )}
+            {ordens.length > 0 && visibleOrders.length === 0 && (
+              <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18, textAlign: "center", color: "rgba(255,255,255,0.48)", fontSize: 13, lineHeight: 1.5 }}>
+                Nada nesta lista agora.
+              </div>
+            )}
             <div className="bordo-list-grid">
-            {ordens.map(os => {
+            {visibleOrders.map(os => {
               const tasks = os.itens || [];
-              const done = tasks.filter((item) => Number(item.done)).length;
-              const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+              const progress = orderProgress(os);
               const latestExecution = (os.execucoes || [])[0];
+              const due = dateKey(os.previsao);
+              const late = due && due < todayKey() && !isClosedOrder(os);
               return (
-                <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14, marginBottom: 10 }}>
+                <div key={os.id} style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${late ? "rgba(239,68,68,0.35)" : "rgba(255,255,255,0.07)"}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{os.codigo}</div>
@@ -452,32 +671,33 @@ export default function NauticoPro({ profile, onLogout }) {
                     </div>
                     <StatusBadge status={os.status} />
                   </div>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 8, lineHeight: 1.4 }}>{os.descricao}</p>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 8, lineHeight: 1.4 }}>{os.descricao || "Sem descricao."}</p>
                   <div style={{ display: "grid", gridTemplateColumns: os.status === "aguardando" ? "1fr 1fr" : "1fr", gap: 8, marginBottom: 10 }}>
                     {os.status === "aguardando" && (
                       <button type="button" onClick={() => updateOrderStatus(os.id, "em_andamento")} style={primaryButton}>
                         Iniciar servico
                       </button>
                     )}
-                    {os.status !== "concluida" && (
-                      <button type="button" onClick={() => updateOrderStatus(os.id, "concluida")} style={ghostButton}>
+                    {!isClosedOrder(os) && (
+                      <button type="button" onClick={() => finishOrder(os)} style={ghostButton}>
                         Concluir OS
                       </button>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.tipo}</span>
-                    <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{os.prioridade}</span>
-                    <span style={{ fontSize: 10, background: "rgba(255,255,255,0.08)", borderRadius: 5, padding: "2px 7px", color: "rgba(255,255,255,0.5)" }}>{done}/{tasks.length} tarefas</span>
+                    <span style={tagStyle}>{os.tipo || "Servico"}</span>
+                    <span style={{ ...tagStyle, color: os.prioridade === "urgente" ? C.gold : "rgba(255,255,255,0.5)" }}>{os.prioridade || "normal"}</span>
+                    <span style={{ ...tagStyle, color: late ? C.rust : "rgba(255,255,255,0.5)" }}>Prazo: {due || "sem data"}</span>
+                    <span style={tagStyle}>{progress.done}/{progress.total} tarefas</span>
                   </div>
 
                   <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: 800, marginBottom: 8 }}>
                       <span>Checklist do servico</span>
-                      <span>{progress}%</span>
+                      <span>{progress.percent}%</span>
                     </div>
                     <div style={{ background: "rgba(255,255,255,0.10)", borderRadius: 99, height: 6, marginBottom: 8 }}>
-                      <div style={{ width: `${progress}%`, height: "100%", borderRadius: 99, background: C.aqua }} />
+                      <div style={{ width: `${progress.percent}%`, height: "100%", borderRadius: 99, background: C.aqua }} />
                     </div>
                     {tasks.length === 0 && <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>Esta OS ainda nao tem checklist.</div>}
                     {tasks.map((item) => (
@@ -501,6 +721,18 @@ export default function NauticoPro({ profile, onLogout }) {
                   <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
                     <label style={fieldStyle}>
                       Observacao do servico
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {["Faltou material", "Aguardando peca", "Cliente ausente"].map((text) => (
+                          <button
+                            key={text}
+                            type="button"
+                            onClick={() => setExecutionNotes((current) => ({ ...current, [os.id]: text }))}
+                            style={{ ...ghostButton, padding: "6px 8px", fontSize: 10 }}
+                          >
+                            {text}
+                          </button>
+                        ))}
+                      </div>
                       <textarea
                         value={executionNotes[os.id] || ""}
                         onChange={(event) => setExecutionNotes((current) => ({ ...current, [os.id]: event.target.value }))}
@@ -608,11 +840,44 @@ const photoCategories = [
   ["documento", "Documento"],
 ];
 
-function MiniMetric({ label, value, color }) {
+const checklistGroups = [
+  {
+    value: "Seguranca",
+    label: "Segurança e salvatagem",
+    desc: "Antes de qualquer serviço ou saída: itens obrigatórios, acesso e validade.",
+  },
+  {
+    value: "Pre-servico",
+    label: "Pré-serviço",
+    desc: "Confere escopo, local, ferramentas e proteção da área.",
+  },
+  {
+    value: "Motor e eletrica",
+    label: "Motor e elétrica",
+    desc: "Inspeção visual rápida para evitar dano, risco e retrabalho.",
+  },
+  {
+    value: "Limpeza e acabamento",
+    label: "Limpeza e acabamento",
+    desc: "Produtos, drenos e acabamento final sem mancha ou resíduo.",
+  },
+  {
+    value: "Evidencias",
+    label: "Evidências",
+    desc: "Fotos e observações que protegem a equipe e informam o gestor.",
+  },
+  {
+    value: "Encerramento",
+    label: "Encerramento",
+    desc: "Área limpa, pendências claras e gestor avisado quando necessário.",
+  },
+];
+
+function MiniMetric({ label, value, color, compact = false }) {
   return (
-    <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 12 }}>
-      <div style={{ color, fontSize: 10, fontWeight: 900, letterSpacing: 1.4, textTransform: "uppercase" }}>{label}</div>
-      <div style={{ color: C.white, fontSize: 22, fontWeight: 900, marginTop: 4 }}>{value}</div>
+    <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: compact ? 10 : 12 }}>
+      <div style={{ color, fontSize: compact ? 9 : 10, fontWeight: 900, letterSpacing: 1.1, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ color: C.white, fontSize: compact ? 19 : 22, fontWeight: 900, marginTop: 4 }}>{value}</div>
     </div>
   );
 }
@@ -682,6 +947,14 @@ const fieldStyle = {
   color: "rgba(255,255,255,0.58)",
   fontSize: 12,
   fontWeight: 700,
+};
+
+const tagStyle = {
+  fontSize: 10,
+  background: "rgba(255,255,255,0.08)",
+  borderRadius: 5,
+  padding: "2px 7px",
+  color: "rgba(255,255,255,0.5)",
 };
 
 const primaryButton = {

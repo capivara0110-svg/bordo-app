@@ -248,7 +248,8 @@ async function getOrderPhotos(id, empresaId) {
 }
 
 async function getOrderReport(order, empresaId) {
-  const [cliente, embarcacao, fotos] = await Promise.all([
+  const [empresa, cliente, embarcacao, fotos] = await Promise.all([
+    db.prepare("SELECT id, nome, slug FROM empresas WHERE id = ?").get(empresaId),
     order.cliente_id
       ? db.prepare("SELECT * FROM clientes WHERE id = ? AND empresa_id = ?").get(order.cliente_id, empresaId)
       : null,
@@ -264,6 +265,7 @@ async function getOrderReport(order, empresaId) {
   ]);
 
   return {
+    empresa: empresa || { id: empresaId, nome: "", slug: "" },
     ordem: order,
     cliente: cliente || {
       nome: order.cliente || "",
