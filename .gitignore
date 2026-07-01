@@ -13,3 +13,5 @@ server/backups/
 server/uploads/
 server/idx_*
 server/*_tmp.js
+
+.vercel
